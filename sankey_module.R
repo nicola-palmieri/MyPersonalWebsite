@@ -1,0 +1,130 @@
+sankey_app_ui <- function(id) {
+  ns <- NS(id)
+
+  sidebarLayout(
+    sidebarPanel(
+      fileInput(ns("file"), "Upload metadata file"),
+      uiOutput(ns("col_select")),
+      numericInput(ns("width"), "Plot width (inches)", 7, min = 3, max = 20),
+      numericInput(ns("height"), "Plot height (inches)", 5, min = 3, max = 20),
+      selectInput(ns("format"), "Download format", choices = c("png", "pdf")),
+      actionButton(ns("go"), "Generate Sankey"),
+      downloadButton(ns("download_plot"), "Download Sankey Plot")
+    ),
+    mainPanel(
+      h4("Data Preview"),
+      tableOutput(ns("preview")),
+      hr(),
+      networkD3::sankeyNetworkOutput(ns("sankey"), height = "600px")
+    )
+  )
+}
+
+sankey_app_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    data <- reactive({
+      req(input$file)
+      tryCatch({
+        readr::read_delim(input$file$datapath, delim = "\t", show_col_types = FALSE)
+      }, error = function(e) {
+        readr::read_csv(input$file$datapath, show_col_types = FALSE)
+      })
+    })
+
+    output$preview <- renderTable({
+      req(data())
+      utils::head(data(), 10)
+    })
+
+    output$col_select <- renderUI({
+      req(data())
+      cols <- names(data())
+      selectizeInput(
+        session$ns("cols"),
+        "Select columns for Sankey (in order)",
+        choices = cols,
+        multiple = TRUE
+      )
+    })
+
+    edges <- eventReactive(input$go, {
+      req(data(), input$cols)
+      req(length(input$cols) >= 2)
+      df <- data()[, input$cols, drop = FALSE]
+
+      edges_list <- list()
+      for (i in seq_along(input$cols)[-length(input$cols)]) {
+        tmp <- df |>
+          dplyr::count(
+            rlang::.data[[input$cols[i]]],
+            rlang::.data[[input$cols[i + 1]]],
+            name = "value"
+          )
+        colnames(tmp)[1:2] <- c("source", "target")
+        tmp <- tmp |>
+          dplyr::mutate(
+            source = as.character(rlang::.data$source),
+            target = as.character(rlang::.data$target)
+          )
+        edges_list[[i]] <- tmp
+      }
+      dplyr::bind_rows(edges_list)
+    })
+
+    nodes <- reactive({
+      req(edges())
+      tibble::tibble(name = unique(c(edges()$source, edges()$target)))
+    })
+
+    sankey_obj <- reactive({
+      req(edges(), nodes())
+      links <- edges() |>
+        dplyr::mutate(
+          source = match(rlang::.data$source, nodes()$name) - 1,
+          target = match(rlang::.data$target, nodes()$name) - 1
+        )
+
+      networkD3::sankeyNetwork(
+        Links = links,
+        Nodes = nodes(),
+        Source = "source",
+        Target = "target",
+        Value = "value",
+        NodeID = "name",
+        fontSize = 12,
+        nodeWidth = 30
+      )
+    })
+
+    output$sankey <- networkD3::renderSankeyNetwork({
+      sankey_obj()
+    })
+
+    output$download_plot <- downloadHandler(
+      filename = function() {
+        paste0("sankey_plot.", input$format)
+      },
+      content = function(file) {
+        tmp_html <- tempfile(fileext = ".html")
+        htmlwidgets::saveWidget(sankey_obj(), tmp_html, selfcontained = TRUE)
+        if (input$format == "png") {
+          webshot2::webshot(
+            url = tmp_html,
+            file = file,
+            vwidth = input$width * 96,
+            vheight = input$height * 96,
+            zoom = 300 / 96
+          )
+        } else if (input$format == "pdf") {
+          webshot2::webshot(
+            url = tmp_html,
+            file = file,
+            vwidth = input$width * 96,
+            vheight = input$height * 96,
+            zoom = 300 / 96
+          )
+        }
+      }
+    )
+  })
+}
