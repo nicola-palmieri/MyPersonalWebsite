@@ -34,44 +34,26 @@ ui <- navbarPage(
       )
     ),
     hr(),
-    h3("🧰 My Shiny Apps"),
-    fluidRow(
-      column(
-        4,
-        card(
-          card_header("Sankey Plot Builder"),
-          card_body(
-            p("Build interactive Sankey diagrams from metadata tables."),
-            actionButton(
-              inputId = "open_sankey",
-              label = "Open App",
-              class = "btn btn-primary"
-            )
-          )
-        )
-      )
-    ),
-    conditionalPanel(
-      condition = "input.open_sankey >= 1",
-      hr(),
-      h3("Sankey Plot Builder"),
-      sankey_app_ui("sankey")
-    ),
-    hr(),
     tags$footer(
       align = "center",
       style = "margin-top: 40px; color: #777;",
       "© 2025 Your Name — Built with R Shiny"
+    )
+  ),
+  navbarMenu(
+    title = "Apps",
+    tabPanel(
+      title = "Sankey Plot Builder",
+      fluidPage(
+        h3("Sankey Plot Builder"),
+        sankey_app_ui("sankey")
+      )
     )
   )
 )
 
 server <- function(input, output, session) {
   sankey_app_server("sankey")
-
-  observeEvent(input$open_sankey, {
-    updateNavbarPage(session, inputId = "main_nav", selected = "Home")
-  })
 }
 
 shinyApp(ui, server)
