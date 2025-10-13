@@ -49,36 +49,6 @@ ui <- navbarPage(
             )
           )
         )
-      ),
-      column(
-        4,
-        card(
-          card_header("Volcano Plot Tool"),
-          card_body(
-            p("Visualize differential expression results interactively."),
-            tags$a(
-              href = "https://yourname.shinyapps.io/volcano_plot_tool",
-              target = "_blank",
-              class = "btn btn-primary",
-              "Open App"
-            )
-          )
-        )
-      ),
-      column(
-        4,
-        card(
-          card_header("OrganoViz Explorer"),
-          card_body(
-            p("Interactive visualization of calcium imaging data from brain organoids."),
-            tags$a(
-              href = "https://yourname.shinyapps.io/organoviz_explorer",
-              target = "_blank",
-              class = "btn btn-primary",
-              "Open App"
-            )
-          )
-        )
       )
     ),
     hr(),
