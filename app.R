@@ -29,7 +29,7 @@ ui <- navbarPage(
           tags$li("🔬 Fields: Bioinformatics, Genomics, Neural Data Analysis"),
           tags$li("💡 Interests: Evolution, Organoids, R/Python pipelines"),
           tags$li("📧 Contact: ", tags$a(href = "mailto:palmierinico@gmail.com", "palmierinico@gmail.com")),
-          tags$li("🌍 GitHub: ", tags$a(href = "https://github.com/yourname", "github.com/yourname"))
+          tags$li("🌍 GitHub: ", tags$a(href = "https://github.com/nicola-palmieri", "github.com/nicola-palmieri"))
         )
       )
     ),
