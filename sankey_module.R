@@ -90,23 +90,33 @@ sankey_app_server <- function(id) {
       req(data(), input$cols)
       req(length(input$cols) >= 2)
       df <- data()[, input$cols, drop = FALSE]
-
-      edges_list <- list()
+      
+      edges_list <- vector("list", length(input$cols) - 1)
+      
       for (i in seq_len(length(input$cols) - 1)) {
-        col_pair <- rlang::syms(input$cols[c(i, i + 1)])
-
+        col1 <- input$cols[i]
+        col2 <- input$cols[i + 1]
+        
         tmp <- df |>
-          dplyr::count(!!!col_pair, name = "value") |>
-          dplyr::rename(source = 1, target = 2) |>
+          dplyr::count(
+            .data[[col1]],
+            .data[[col2]],
+            name = "value"
+          ) |>
+          dplyr::rename(
+            source = 1,
+            target = 2
+          ) |>
           dplyr::mutate(
             dplyr::across(c(source, target), as.character)
           )
-
+        
         edges_list[[i]] <- tmp
       }
-
+      
       dplyr::bind_rows(edges_list)
     })
+    
 
     nodes <- reactive({
       req(edges())
@@ -115,12 +125,13 @@ sankey_app_server <- function(id) {
 
     sankey_obj <- reactive({
       req(edges(), nodes())
+      
       links <- edges() |>
         dplyr::mutate(
-          source = match(rlang::.data$source, nodes()$name) - 1,
-          target = match(rlang::.data$target, nodes()$name) - 1
+          source = match(source, nodes()$name) - 1,
+          target = match(target, nodes()$name) - 1
         )
-
+      
       networkD3::sankeyNetwork(
         Links = links,
         Nodes = nodes(),
