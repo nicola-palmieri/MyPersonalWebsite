@@ -51,16 +51,18 @@ ui <- navbarPage(
         )
       )
     ),
+    conditionalPanel(
+      condition = "input.open_sankey >= 1",
+      hr(),
+      h3("Sankey Plot Builder"),
+      sankey_app_ui("sankey")
+    ),
     hr(),
     tags$footer(
       align = "center",
       style = "margin-top: 40px; color: #777;",
       "© 2025 Your Name — Built with R Shiny"
     )
-  ),
-  tabPanel(
-    title = "Sankey Plot Builder",
-    sankey_app_ui("sankey")
   )
 )
 
@@ -68,7 +70,7 @@ server <- function(input, output, session) {
   sankey_app_server("sankey")
 
   observeEvent(input$open_sankey, {
-    updateNavbarPage(session, inputId = "main_nav", selected = "Sankey Plot Builder")
+    updateNavbarPage(session, inputId = "main_nav", selected = "Home")
   })
 }
 
