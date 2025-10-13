@@ -92,21 +92,19 @@ sankey_app_server <- function(id) {
       df <- data()[, input$cols, drop = FALSE]
 
       edges_list <- list()
-      for (i in seq_along(input$cols)[-length(input$cols)]) {
+      for (i in seq_len(length(input$cols) - 1)) {
+        col_pair <- rlang::syms(input$cols[c(i, i + 1)])
+
         tmp <- df |>
-          dplyr::count(
-            rlang::.data[[input$cols[i]]],
-            rlang::.data[[input$cols[i + 1]]],
-            name = "value"
-          )
-        colnames(tmp)[1:2] <- c("source", "target")
-        tmp <- tmp |>
+          dplyr::count(!!!col_pair, name = "value") |>
+          dplyr::rename(source = 1, target = 2) |>
           dplyr::mutate(
-            source = as.character(rlang::.data$source),
-            target = as.character(rlang::.data$target)
+            dplyr::across(c(source, target), as.character)
           )
+
         edges_list[[i]] <- tmp
       }
+
       dplyr::bind_rows(edges_list)
     })
 
