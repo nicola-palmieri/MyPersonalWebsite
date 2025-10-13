@@ -1,8 +1,21 @@
+#' Sankey diagram builder module
+#'
+#' Provides UI and server logic for uploading tabular metadata and generating a
+#' Sankey diagram. The module supports multiple tabular formats and offers an
+#' interactive data preview using DT.
+library(DT)
+library(readxl)
+library(data.table)
+
 sankey_app_ui <- function(id) {
   ns <- NS(id)
 
   sidebarLayout(
     sidebarPanel(
+      helpText(
+        "Upload a table with at least two categorical columns — e.g., sample",
+        "metadata or factors. Accepted formats: .csv, .tsv, .txt, .xlsx."
+      ),
       fileInput(ns("file"), "Upload metadata file"),
       uiOutput(ns("col_select")),
       numericInput(ns("width"), "Plot width (inches)", 7, min = 3, max = 20),
@@ -13,7 +26,7 @@ sankey_app_ui <- function(id) {
     ),
     mainPanel(
       h4("Data Preview"),
-      tableOutput(ns("preview")),
+      DTOutput(ns("preview")),
       hr(),
       networkD3::sankeyNetworkOutput(ns("sankey"), height = "600px")
     )
@@ -24,16 +37,42 @@ sankey_app_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     data <- reactive({
       req(input$file)
-      tryCatch({
-        readr::read_delim(input$file$datapath, delim = "\t", show_col_types = FALSE)
+      ext <- tolower(tools::file_ext(input$file$name))
+
+      df <- tryCatch({
+        switch(
+          ext,
+          csv = readr::read_csv(input$file$datapath, show_col_types = FALSE),
+          tsv = readr::read_tsv(input$file$datapath, show_col_types = FALSE),
+          txt = readr::read_delim(
+            input$file$datapath,
+            delim = NULL,
+            show_col_types = FALSE
+          ),
+          xlsx = readxl::read_excel(input$file$datapath),
+          validate(need(FALSE, paste0("Unsupported file type: .", ext)))
+        )
       }, error = function(e) {
-        readr::read_csv(input$file$datapath, show_col_types = FALSE)
+        validate(need(FALSE, "Unable to read the uploaded file. Please check the format and try again."))
       })
+
+      df <- tibble::as_tibble(df)
+      validate(need(ncol(df) >= 2, "Upload a table with at least two categorical columns — e.g., sample metadata or factors."))
+      df
     })
 
-    output$preview <- renderTable({
+    output$preview <- DT::renderDataTable({
       req(data())
-      utils::head(data(), 10)
+      DT::datatable(
+        data(),
+        options = list(
+          pageLength = 25,
+          lengthChange = FALSE,
+          scrollY = "400px",
+          scrollX = TRUE
+        ),
+        rownames = FALSE
+      )
     })
 
     output$col_select <- renderUI({
@@ -53,21 +92,19 @@ sankey_app_server <- function(id) {
       df <- data()[, input$cols, drop = FALSE]
 
       edges_list <- list()
-      for (i in seq_along(input$cols)[-length(input$cols)]) {
+      for (i in seq_len(length(input$cols) - 1)) {
+        col_pair <- rlang::syms(input$cols[c(i, i + 1)])
+
         tmp <- df |>
-          dplyr::count(
-            rlang::.data[[input$cols[i]]],
-            rlang::.data[[input$cols[i + 1]]],
-            name = "value"
-          )
-        colnames(tmp)[1:2] <- c("source", "target")
-        tmp <- tmp |>
+          dplyr::count(!!!col_pair, name = "value") |>
+          dplyr::rename(source = 1, target = 2) |>
           dplyr::mutate(
-            source = as.character(rlang::.data$source),
-            target = as.character(rlang::.data$target)
+            dplyr::across(c(source, target), as.character)
           )
+
         edges_list[[i]] <- tmp
       }
+
       dplyr::bind_rows(edges_list)
     })
 
