@@ -178,17 +178,13 @@ sankey_app_server <- function(id) {
     # Download handler
     output$download_plot <- downloadHandler(
       filename = function() {
-        paste0("sankey_plot.", input$format)
+        "sankey_plot.html"
       },
       content = function(file) {
-        tmp_html <- tempfile(fileext = ".html")
-        htmlwidgets::saveWidget(sankey_obj(), tmp_html, selfcontained = TRUE)
-        webshot2::webshot(
-          url = tmp_html,
-          file = file,
-          vwidth = input$width * 96,
-          vheight = input$height * 96,
-          zoom = 300 / 96
+        htmlwidgets::saveWidget(
+          sankey_obj(),
+          file,
+          selfcontained = TRUE
         )
       }
     )
