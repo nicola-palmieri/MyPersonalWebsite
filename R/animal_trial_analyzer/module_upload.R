@@ -18,16 +18,11 @@ upload_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     df <- reactiveVal(NULL)
-    
-    # Default UI while waiting
-    output$sheet_selector <- renderUI({
-      p("📄 Waiting for Excel upload…")
-    })
+      
     output$validation_msg <- renderText({ "" })
     
     # ---- STEP 1: after file upload, list sheets (NEVER silent) ----
     observeEvent(input$file, {
-      cat(">>> Uploaded file:", input$file$datapath, "\n")
       
       req(input$file)
       # small delay to ensure tempfile is fully written
@@ -106,7 +101,7 @@ upload_server <- function(id) {
       df(tmp)
       
       output$preview <- renderDT(
-        head(tmp, 10),
+        tmp,
         options = list(scrollX = TRUE, pageLength = 5)
       )
     }, ignoreInit = TRUE)

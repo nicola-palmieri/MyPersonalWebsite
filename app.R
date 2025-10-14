@@ -228,6 +228,7 @@ ui <- navbarPage(
 
 server <- function(input, output, session) {
   sankey_app_server("sankey")
+  animal_trial_app_server("animal_trial")
 }
 
 shinyApp(ui, server)
