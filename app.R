@@ -1,12 +1,20 @@
 library(shiny)
 library(bslib)
+library(readxl)
+library(DT)
+library(tools)
+
+options(shiny.autoreload = TRUE)
+
 
 source("sankey_module.R")
+source("animal_trial_analyzer_module.R")
 
 ui <- navbarPage(
   title = "🧬 Dr. Nicola Palmieri",
   id = "main_nav",
   theme = bs_theme(bootswatch = "flatly"),
+  selected = "Animal Trial Analyzer", # TEMPORARILY SELECT THIS APP
   tabPanel(
     title = "Home",
     fluidPage(
@@ -206,6 +214,13 @@ ui <- navbarPage(
       fluidPage(
         h3("Sankey Plot Builder"),
         sankey_app_ui("sankey")
+      )
+    ),
+    tabPanel(
+      title = "Animal Trial Analyzer",
+      fluidPage(
+        h3("Animal Trial Analyzer"),
+        animal_trial_app_ui("animal_trial")
       )
     )
   )
