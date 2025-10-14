@@ -27,17 +27,14 @@ animal_trial_app_server <- function(id) {
     output$upload_section <- renderUI({
       upload_ui(ns("upload"))
     })
-    
+
     # --- 2️⃣ Filter (requires uploaded data)
     output$filter_section <- renderUI({
       req(uploaded())
       filter_ui(ns("filter"))
     })
-    filtered <- reactive({
-      req(uploaded())
-      filter_server("filter", uploaded)
-    })
-    
+    filtered <- filter_server("filter", uploaded)
+
     # --- 3️⃣ Analysis (requires uploaded data, not model yet)
     output$analysis_section <- renderUI({
       req(uploaded())
