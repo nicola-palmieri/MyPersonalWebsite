@@ -1,0 +1,10 @@
+name: mypersonalwebsite
+title:
+username: nicola-palmieri
+account: nicola-palmieri
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 15738160
+bundleId: 11027597
+url: https://nicola-palmieri.shinyapps.io/mypersonalwebsite/
+version: 1
