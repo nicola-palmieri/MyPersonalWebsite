@@ -123,6 +123,7 @@ sankey_app_server <- function(id) {
       )
     })
     
+    
     # Build edges dynamically (auto-updating, no button)
     edges <- reactive({
       req(data(), input$cols)
