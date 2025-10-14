@@ -1,9 +1,10 @@
 # ===============================================================
-# 🧪 Animal Trial Analyzer — Analysis Module
+# 🧪 Animal Trial Analyzer — Analysis Coordinator
 # ===============================================================
 library(shiny)
-library(DT)
-library(broom)
+
+source("R/animal_trial_analyzer/module_analysis_anova.R")
+source("R/animal_trial_analyzer/module_analysis_utils.R")
 
 analysis_ui <- function(id) {
   ns <- NS(id)
@@ -12,16 +13,10 @@ analysis_ui <- function(id) {
     selectInput(
       ns("analysis_type"),
       "Select analysis type:",
-      choices = c("ANOVA"),
-      selected = "ANOVA"
+      choices = c("One-way ANOVA"),  # more will be added here later
+      selected = "One-way ANOVA"
     ),
-    uiOutput(ns("analysis_inputs")),
-    uiOutput(ns("level_order_ui")),
-    br(),
-    actionButton(ns("run_anova"), "Run ANOVA"),
-    br(), br(),
-    verbatimTextOutput(ns("model_summary")),
-    DTOutput(ns("fixed_effects_table"))
+    uiOutput(ns("analysis_panel"))
   )
 }
 
@@ -34,92 +29,26 @@ analysis_server <- function(id, filtered_data) {
       filtered_data()
     })
     
-    # -----------------------------------------------------------
-    # Dynamic inputs for ANOVA
-    # -----------------------------------------------------------
-    output$analysis_inputs <- renderUI({
-      req(df(), input$analysis_type == "ANOVA")
-      data <- df()
-      
-      num_cols <- names(data)[sapply(data, is.numeric)]
-      cat_cols <- names(data)[sapply(data, function(x) is.character(x) || is.factor(x))]
-      
-      tagList(
-        selectInput(
-          ns("response_var"),
-          "Response variable (numeric):",
-          choices = num_cols,
-          selected = if (length(num_cols) > 0) num_cols[1] else NULL
-        ),
-        selectInput(
-          ns("group_var"),
-          "Grouping variable (factor):",
-          choices = cat_cols,
-          selected = if (length(cat_cols) > 0) cat_cols[1] else NULL
-        )
-      )
+    # Dynamically show the correct submodule based on selection
+    output$analysis_panel <- renderUI({
+      req(input$analysis_type)
+      if (input$analysis_type == "One-way ANOVA") {
+        one_way_anova_ui(ns("anova"))
+      } else {
+        p("Analysis type not implemented yet.")
+      }
     })
     
-    # -----------------------------------------------------------
-    # Level order selector (after choosing grouping variable)
-    # -----------------------------------------------------------
-    output$level_order_ui <- renderUI({
-      req(df(), input$group_var)
-      data <- df()
-      group_values <- unique(as.character(data[[input$group_var]]))
-      tagList(
-        orderInput <- selectInput(
-          ns("level_order"),
-          "Order of levels (first = reference):",
-          choices = group_values,
-          selected = group_values,
-          multiple = TRUE,
-          selectize = TRUE
-        )
-      )
+    # Dynamically run submodule
+    model_fit <- reactive({
+      req(input$analysis_type)
+      if (input$analysis_type == "One-way ANOVA") {
+        one_way_anova_server("anova", df)
+      } else {
+        NULL
+      }
     })
     
-    # -----------------------------------------------------------
-    # Run ANOVA
-    # -----------------------------------------------------------
-    model_fit <- eventReactive(input$run_anova, {
-      req(df(), input$response_var, input$group_var)
-      data <- df()
-      
-      # Ensure factor level order
-      group <- factor(
-        data[[input$group_var]],
-        levels = input$level_order
-      )
-      data[[input$group_var]] <- group
-      
-      model_formula <- as.formula(paste(input$response_var, "~", input$group_var))
-      lm(model_formula, data = data)
-      
-    })
-    
-    # -----------------------------------------------------------
-    # Show summary(lm)
-    # -----------------------------------------------------------
-    output$model_summary <- renderPrint({
-      req(model_fit())
-      summary(model_fit())
-    })
-    
-    # -----------------------------------------------------------
-    # Fixed effects table
-    # -----------------------------------------------------------
-    output$fixed_effects_table <- renderDT({
-      req(model_fit())
-      coefs <- broom::tidy(model_fit())
-      datatable(
-        coefs,
-        options = list(scrollX = TRUE, pageLength = 5),
-        rownames = FALSE
-      )
-    })
-    
-    # Return model
     return(model_fit)
   })
 }
