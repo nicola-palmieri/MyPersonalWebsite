@@ -38,8 +38,10 @@ filter_server <- function(id, uploaded_data) {
     
     # --- 2. Dynamic widgets
     output$filter_widgets <- renderUI({
-      req(df(), input$columns)
+      req(df())
       cols <- input$columns
+      isolate(updateSelectInput(session, "columns", selected = cols))
+      if (length(cols) == 0) return(NULL)
       
       widgets <- lapply(cols, function(col) {
         col_data <- df()[[col]]

@@ -219,7 +219,6 @@ ui <- navbarPage(
     tabPanel(
       title = "Animal Trial Analyzer",
       fluidPage(
-        h3("Animal Trial Analyzer"),
         animal_trial_app_ui("animal_trial")
       )
     )
