@@ -7,14 +7,49 @@ library(DT)
 library(readxl)
 library(data.table)
 
+# Provide a ready-to-use demo dataset so users see an example Sankey as soon as
+# the app loads. The data mimics a simple experimental workflow with three
+# categorical stages.
+demo_sankey_data <- tibble::tribble(
+  ~Species,        ~Condition,       ~Outcome,
+  "Chicken",       "Vaccinated",     "Recovered",
+  "Chicken",       "Vaccinated",     "Recovered",
+  "Chicken",       "Control",        "Sick",
+  "Turkey",        "Vaccinated",     "Recovered",
+  "Turkey",        "Control",        "Recovered",
+  "Turkey",        "Control",        "Sick",
+  "Duck",          "Vaccinated",     "Recovered",
+  "Duck",          "Control",        "Recovered",
+  "Duck",          "Control",        "Recovered",
+  "Duck",          "Control",        "Sick"
+)
+
 sankey_app_ui <- function(id) {
   ns <- NS(id)
 
   sidebarLayout(
     sidebarPanel(
-      helpText(
-        "Upload a table with at least two categorical columns — e.g., sample",
-        "metadata or factors. Accepted formats: .csv, .tsv, .txt, .xlsx."
+      tags$div(
+        class = "mb-3",
+        h4("What this app does"),
+        p(
+          strong("Aim."),
+          " Turn plain tables into interactive Sankey flow diagrams with just a few clicks."
+        ),
+        p(
+          strong("Why it matters."),
+          " Researchers and analysts often need to visualise how samples move through experimental stages, yet most Sankey tools require coding knowledge. This interface makes it effortless to build these plots directly from tidy spreadsheets."
+        ),
+        p(
+          strong("How to use it."),
+          " Review the demo data that loads automatically, then upload your own table (CSV, TSV, TXT, XLSX) and select the categorical columns in the order you want the flow to appear."
+        ),
+        tags$ol(
+          tags$li("Prepare a table with at least two categorical columns (e.g., Species → Condition → Outcome)."),
+          tags$li("Upload the file or keep the demo data to experiment."),
+          tags$li("Adjust the column order, preview the table, and download the Sankey as PNG or PDF."),
+          tags$li("Need a fresh start? Simply upload a new dataset—the demo will always be available on reload.")
+        )
       ),
       fileInput(ns("file"), "Upload metadata file"),
       uiOutput(ns("col_select")),
@@ -25,6 +60,17 @@ sankey_app_ui <- function(id) {
       downloadButton(ns("download_plot"), "Download Sankey Plot")
     ),
     mainPanel(
+      tags$div(
+        class = "mb-4",
+        h3("Explore the demo Sankey"),
+        p(
+          "The app opens with a toy dataset showing animal species moving through a vaccination trial and their outcomes.",
+          " Use it as a template to understand the required structure before replacing it with your own data."
+        ),
+        p(
+          "Once you upload a file, the preview and plot update instantly."
+        )
+      ),
       h4("Data Preview"),
       DTOutput(ns("preview")),
       hr(),
@@ -36,7 +82,10 @@ sankey_app_ui <- function(id) {
 sankey_app_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     data <- reactive({
-      req(input$file)
+      if (is.null(input$file)) {
+        return(demo_sankey_data)
+      }
+
       ext <- tolower(tools::file_ext(input$file$name))
 
       df <- tryCatch({
@@ -76,23 +125,37 @@ sankey_app_server <- function(id) {
     })
 
     output$col_select <- renderUI({
-      req(data())
-      cols <- names(data())
       selectizeInput(
         session$ns("cols"),
         "Select columns for Sankey (in order)",
-        choices = cols,
+        choices = NULL,
         multiple = TRUE
       )
     })
 
-    edges <- eventReactive(input$go, {
+    observeEvent(data(), {
+      cols <- names(data())
+      default_selection <- cols[seq_len(min(3, length(cols)))]
+      updateSelectizeInput(
+        session,
+        "cols",
+        choices = cols,
+        selected = default_selection,
+        server = TRUE
+      )
+    }, ignoreNULL = FALSE)
+
+    edges <- eventReactive({
+      input$go
+      data()
+      input$cols
+    }, {
       req(data(), input$cols)
       req(length(input$cols) >= 2)
       df <- data()[, input$cols, drop = FALSE]
-      
+
       edges_list <- vector("list", length(input$cols) - 1)
-      
+
       for (i in seq_len(length(input$cols) - 1)) {
         col1 <- input$cols[i]
         col2 <- input$cols[i + 1]
@@ -113,10 +176,10 @@ sankey_app_server <- function(id) {
         
         edges_list[[i]] <- tmp
       }
-      
+
       dplyr::bind_rows(edges_list)
-    })
-    
+    }, ignoreNULL = FALSE)
+
 
     nodes <- reactive({
       req(edges())
