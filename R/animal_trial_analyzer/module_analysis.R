@@ -40,15 +40,25 @@ analysis_server <- function(id, filtered_data) {
     })
     
     # Dynamically run submodule
-    model_fit <- reactive({
+    model_fit <- reactiveVal(NULL)
+
+    observeEvent(input$analysis_type, {
       req(input$analysis_type)
+
       if (input$analysis_type == "One-way ANOVA") {
-        one_way_anova_server("anova", df)
+        model_fit(one_way_anova_server("anova", df))
       } else {
-        NULL
+        model_fit(NULL)
       }
+    }, ignoreNULL = FALSE)
+
+    # Expose a reactive that yields the fitted model object once available
+    reactive({
+      model_reactive <- model_fit()
+      req(model_reactive)
+      model <- model_reactive()
+      req(model)
+      model
     })
-    
-    return(model_fit)
   })
 }
