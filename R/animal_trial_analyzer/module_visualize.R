@@ -9,7 +9,6 @@ visualize_ui <- function(id) {
   ns <- NS(id)
   tagList(
     h4("4. Visualization"),
-    p("Line plot showing group means ± standard error (for one-way ANOVA)."),
     fluidRow(
       column(
         width = 6,
