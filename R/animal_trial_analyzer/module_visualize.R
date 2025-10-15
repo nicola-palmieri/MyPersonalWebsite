@@ -10,7 +10,32 @@ visualize_ui <- function(id) {
   tagList(
     h4("4. Visualization"),
     p("Line plot showing group means ± standard error (for one-way ANOVA)."),
-    plotOutput(ns("mean_se_plot"), height = "400px")
+    fluidRow(
+      column(
+        width = 6,
+        numericInput(
+          ns("plot_width"),
+          label = "Plot width (px)",
+          value = 800,
+          min = 300,
+          max = 2400,
+          step = 50
+        )
+      ),
+      column(
+        width = 6,
+        numericInput(
+          ns("plot_height"),
+          label = "Plot height (px)",
+          value = 450,
+          min = 300,
+          max = 1600,
+          step = 50
+        )
+      )
+    ),
+    downloadButton(ns("download_plot"), "Download PNG (300 dpi)"),
+    plotOutput(ns("mean_se_plot"))
   )
 }
 
@@ -54,11 +79,11 @@ visualize_server <- function(id, filtered_data, model_fit) {
     # -----------------------------------------------------------
     # Plot mean ± SE
     # -----------------------------------------------------------
-    output$mean_se_plot <- renderPlot({
+    plot_obj <- reactive({
       req(summary_stats(), vars())
       stats <- summary_stats()
       grp <- vars()$group
-      
+
       ggplot(stats, aes(x = !!sym(grp), y = mean, group = 1)) +
         geom_line(color = "steelblue", linewidth = 1) +
         geom_point(size = 3, color = "steelblue") +
@@ -71,5 +96,34 @@ visualize_server <- function(id, filtered_data, model_fit) {
           panel.grid.major.x = element_blank()
         )
     })
+
+    output$mean_se_plot <- renderPlot({
+      req(plot_obj())
+      plot_obj()
+    },
+    width = function() input$plot_width,
+    height = function() input$plot_height,
+    res = 96)
+
+    output$download_plot <- downloadHandler(
+      filename = function() {
+        paste0("mean_se_plot_", Sys.Date(), ".png")
+      },
+      content = function(file) {
+        req(plot_obj(), input$plot_width, input$plot_height)
+        width_in <- input$plot_width / 300
+        height_in <- input$plot_height / 300
+        ggsave(
+          filename = file,
+          plot = plot_obj(),
+          device = "png",
+          dpi = 300,
+          width = width_in,
+          height = height_in,
+          units = "in",
+          limitsize = FALSE
+        )
+      }
+    )
   })
 }
