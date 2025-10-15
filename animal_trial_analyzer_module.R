@@ -15,55 +15,145 @@ animal_trial_app_ui <- function(id) {
       id = ns("main_tabs"),
       tabPanel(
         title = "1️⃣ Upload",
-        div(
-          class = "pt-3",
-          upload_ui(ns("upload")),
-          div(
-            style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
-            div(style = "width: 120px;"),
-            actionButton(ns("go_filter"), "Continue →", class = "btn-primary")
+        {
+          upload_components <- upload_ui(ns("upload"))
+          sidebarLayout(
+            sidebarPanel(
+              width = 4,
+              h4("Step 1 — Upload Data"),
+              p("Upload your Excel file in long format, choose the worksheet, and follow the guidance before proceeding."),
+              hr(),
+              upload_components[[2]],
+              upload_components[[3]],
+              hr(),
+              div(
+                class = "d-flex justify-content-end",
+                actionButton(ns("go_filter"), "Continue →", class = "btn-primary")
+              )
+            ),
+            mainPanel(
+              width = 8,
+              h4("Data Preview"),
+              upload_components[[5]],
+              hr(),
+              upload_components[[6]]
+            )
           )
-        )
+        }
       ),
       tabPanel(
         title = "2️⃣ Filter",
-        div(
-          class = "pt-3",
-          filter_ui(ns("filter")),
-          div(
-            style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
-            actionButton(ns("back_upload"), "← Back"),
-            actionButton(ns("go_analysis"), "Continue →", class = "btn-primary")
+        {
+          filter_components <- filter_ui(ns("filter"))
+          sidebarLayout(
+            sidebarPanel(
+              width = 4,
+              h4("Step 2 — Filter Records"),
+              p("Pick the columns to focus on and adjust the filters to refine the dataset for analysis."),
+              hr(),
+              filter_components[[2]],
+              hr(),
+              filter_components[[3]],
+              hr(),
+              div(
+                class = "d-flex justify-content-between gap-2",
+                actionButton(ns("back_upload"), "← Back"),
+                actionButton(ns("go_analysis"), "Continue →", class = "btn-primary")
+              )
+            ),
+            mainPanel(
+              width = 8,
+              h4("Filtered Data Preview"),
+              filter_components[[5]]
+            )
           )
-        )
+        }
       ),
       tabPanel(
         title = "3️⃣ Analyze",
-        div(
-          class = "pt-3",
-          analysis_ui(ns("analysis")),
-          div(
-            style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
-            actionButton(ns("back_filter"), "← Back"),
-            actionButton(ns("go_visualize"), "Continue →", class = "btn-primary")
+        {
+          analysis_components <- analysis_ui(ns("analysis"))
+          tagList(
+            sidebarLayout(
+              sidebarPanel(
+                width = 4,
+                h4("Step 3 — Analyze Results"),
+                p("Choose the statistical approach that fits your trial design, configure the model, then review the outputs to the right."),
+                hr(),
+                h5("Analysis Configuration"),
+                analysis_components[[2]],
+                hr(),
+                div(
+                  id = ns("analysis_controls_placeholder"),
+                  class = "analysis-controls"
+                ),
+                hr(),
+                div(
+                  class = "d-flex justify-content-between gap-2",
+                  actionButton(ns("back_filter"), "← Back"),
+                  actionButton(ns("go_visualize"), "Continue →", class = "btn-primary")
+                )
+              ),
+              mainPanel(
+                width = 8,
+                h4("Analysis Results"),
+                div(
+                  id = ns("analysis_outputs_container"),
+                  class = "analysis-results",
+                  analysis_components[[3]]
+                )
+              )
+            ),
+            tags$style(
+              HTML(
+                paste0(
+                  "#", ns("analysis_controls_placeholder"), " > * { margin-bottom: 12px; }",
+                  "#", ns("analysis_controls_placeholder"), " > *:last-child { margin-bottom: 0; }"
+                )
+              )
+            ),
+            tags$script(
+              HTML(
+                sprintf(
+                  "(function(){\n                     var controlsId = '%s';\n                     var outputsId = '%s';\n                     function relocateAnalysisElements(){\n                       var $controls = $('#'+controlsId);\n                       var $outputs = $('#'+outputsId);\n                       if(!$controls.length || !$outputs.length){ return; }\n                       var baseId = outputsId.replace(/-analysis_outputs_container$/, '');\n                       var knownControlIds = [\n                         baseId + '-anova_one-inputs',\n                         baseId + '-anova_one-level_order',\n                         baseId + '-anova_one-run',\n                         baseId + '-anova_two-inputs',\n                         baseId + '-anova_two-level_order_1',\n                         baseId + '-anova_two-level_order_2',\n                         baseId + '-anova_two-run'\n                       ];\n                       var escapeSelector = function(id){\n                         return id.replace(/([:\\.[\\],=:@])/g, '\\\\$1');\n                       };\n                       knownControlIds.forEach(function(id){\n                         var selector = '#' + escapeSelector(id);\n                         var $existing = $(selector);\n                         if($existing.length && $existing.closest('#'+controlsId).length){\n                           $existing.remove();\n                         }\n                       });\n                       var controlPattern = /(inputs|level_order|level_order_1|level_order_2)$/;\n                       $outputs.find('[id]').filter(function(){\n                         var id = this.id || '';\n                         return controlPattern.test(id);\n                       }).each(function(){\n                         var $el = $(this);\n                         if(!$el.closest('#'+controlsId).length){\n                           $el.appendTo($controls);\n                         }\n                       });\n                       $outputs.find('[id]').filter(function(){\n                         var id = this.id || '';\n                         return /-run$/.test(id);\n                       }).each(function(){\n                         var $el = $(this);\n                         if(!$el.closest('#'+controlsId).length){\n                           $el.appendTo($controls);\n                         }\n                       });\n                       $controls.find('br').remove();\n                       $outputs.children('br').slice(0, 2).remove();\n                     }\n                     function scheduleRelocate(){ setTimeout(relocateAnalysisElements, 75); }\n                     $(document).on('shiny:value', function(event){\n                       var id = event.target && event.target.id ? event.target.id : '';\n                       if(id.endsWith('analysis_panel') || id.endsWith('analysis_type')){\n                         scheduleRelocate();\n                       }\n                     });\n                     $(document).on('shiny:inputchanged', function(event){\n                       if((event.name || '').endsWith('analysis_type')){\n                         scheduleRelocate();\n                       }\n                     });\n                     $(document).on('shiny:sessioninitialized', function(){ scheduleRelocate(); });\n                     $(document).ready(function(){ scheduleRelocate(); });\n                   })();",
+                  ns("analysis_controls_placeholder"),
+                  ns("analysis_outputs_container")
+                )
+              )
+            )
+            )
           )
-        )
+        }
       ),
       tabPanel(
         title = "4️⃣ Visualize",
-        div(
-          class = "pt-3",
-          visualize_ui(ns("visualize")),
-          div(
-            style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px; gap: 8px;",
-            actionButton(ns("back_analysis"), "← Back"),
-            div(
-              style = "display: flex; gap: 8px;",
-              div(style = "width: 120px;"),
-              actionButton(ns("finish"), "Finish", class = "btn-success")
+        {
+          visualize_components <- visualize_ui(ns("visualize"))
+          sidebarLayout(
+            sidebarPanel(
+              width = 4,
+              h4("Step 4 — Visualize Outcomes"),
+              p("Tweak the layout of the mean ± SE plots, download the figure, and wrap up your workflow."),
+              hr(),
+              visualize_components[[2]],
+              hr(),
+              visualize_components[[3]],
+              hr(),
+              visualize_components[[4]],
+              hr(),
+              div(
+                class = "d-flex justify-content-between gap-2",
+                actionButton(ns("back_analysis"), "← Back"),
+                actionButton(ns("finish"), "Finish", class = "btn-success")
+              )
+            ),
+            mainPanel(
+              width = 8,
+              h4("Mean ± SE Plot"),
+              visualize_components[[5]]
             )
           )
-        )
+        }
       )
     )
   )
