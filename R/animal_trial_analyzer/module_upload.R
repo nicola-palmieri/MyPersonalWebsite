@@ -78,9 +78,9 @@ upload_server <- function(id) {
     }, ignoreInit = TRUE)
     
     # ---- STEP 2: load selected sheet ----
-    observeEvent(input$sheet, {
+    observeEvent(list(input$sheet, input$file$datapath), {
       req(input$file, input$sheet)
-      
+
       tmp <- tryCatch(
         read_excel(input$file$datapath, sheet = input$sheet),
         error = function(e) e
@@ -104,7 +104,7 @@ upload_server <- function(id) {
         tmp,
         options = list(scrollX = TRUE, pageLength = 5)
       )
-    }, ignoreInit = TRUE)
+    }, ignoreInit = TRUE, ignoreNULL = TRUE)
     
     return(df)
   })
