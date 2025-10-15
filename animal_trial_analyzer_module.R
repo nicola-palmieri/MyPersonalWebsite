@@ -15,55 +15,115 @@ animal_trial_app_ui <- function(id) {
       id = ns("main_tabs"),
       tabPanel(
         title = "1️⃣ Upload",
-        div(
-          class = "pt-3",
-          upload_ui(ns("upload")),
-          div(
-            style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
-            div(style = "width: 120px;"),
-            actionButton(ns("go_filter"), "Continue →", class = "btn-primary")
+        {
+          upload_components <- upload_ui(ns("upload"))
+          sidebarLayout(
+            sidebarPanel(
+              width = 4,
+              h4("Step 1 — Upload Data"),
+              p("Upload your Excel file in long format, choose the worksheet, and follow the guidance before proceeding."),
+              hr(),
+              upload_components[[2]],
+              upload_components[[3]],
+              hr(),
+              div(
+                class = "d-flex justify-content-end",
+                actionButton(ns("go_filter"), "Continue →", class = "btn-primary")
+              )
+            ),
+            mainPanel(
+              width = 8,
+              h4("Data Preview"),
+              upload_components[[5]],
+              hr(),
+              upload_components[[6]]
+            )
           )
-        )
+        }
       ),
       tabPanel(
         title = "2️⃣ Filter",
-        div(
-          class = "pt-3",
-          filter_ui(ns("filter")),
-          div(
-            style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
-            actionButton(ns("back_upload"), "← Back"),
-            actionButton(ns("go_analysis"), "Continue →", class = "btn-primary")
+        {
+          filter_components <- filter_ui(ns("filter"))
+          sidebarLayout(
+            sidebarPanel(
+              width = 4,
+              h4("Step 2 — Filter Records"),
+              p("Pick the columns to focus on and adjust the filters to refine the dataset for analysis."),
+              hr(),
+              filter_components[[2]],
+              hr(),
+              filter_components[[3]],
+              hr(),
+              div(
+                class = "d-flex justify-content-between gap-2",
+                actionButton(ns("back_upload"), "← Back"),
+                actionButton(ns("go_analysis"), "Continue →", class = "btn-primary")
+              )
+            ),
+            mainPanel(
+              width = 8,
+              h4("Filtered Data Preview"),
+              filter_components[[5]]
+            )
           )
-        )
+        }
       ),
       tabPanel(
         title = "3️⃣ Analyze",
-        div(
-          class = "pt-3",
-          analysis_ui(ns("analysis")),
-          div(
-            style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
-            actionButton(ns("back_filter"), "← Back"),
-            actionButton(ns("go_visualize"), "Continue →", class = "btn-primary")
+        {
+          analysis_components <- analysis_ui(ns("analysis"))
+          sidebarLayout(
+            sidebarPanel(
+              width = 4,
+              h4("Step 3 — Analyze Results"),
+              p("Choose the statistical approach that fits your trial design, then inspect the summaries on the right."),
+              hr(),
+              analysis_components[[2]],
+              hr(),
+              div(
+                class = "d-flex justify-content-between gap-2",
+                actionButton(ns("back_filter"), "← Back"),
+                actionButton(ns("go_visualize"), "Continue →", class = "btn-primary")
+              )
+            ),
+            mainPanel(
+              width = 8,
+              h4("Analysis Configuration & Output"),
+              analysis_components[[3]]
+            )
           )
-        )
+        }
       ),
       tabPanel(
         title = "4️⃣ Visualize",
-        div(
-          class = "pt-3",
-          visualize_ui(ns("visualize")),
-          div(
-            style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px; gap: 8px;",
-            actionButton(ns("back_analysis"), "← Back"),
-            div(
-              style = "display: flex; gap: 8px;",
-              div(style = "width: 120px;"),
-              actionButton(ns("finish"), "Finish", class = "btn-success")
+        {
+          visualize_components <- visualize_ui(ns("visualize"))
+          sidebarLayout(
+            sidebarPanel(
+              width = 4,
+              h4("Step 4 — Visualize Outcomes"),
+              p("Tweak the layout of the mean ± SE plots, download the figure, and wrap up your workflow."),
+              hr(),
+              visualize_components[[2]],
+              hr(),
+              visualize_components[[3]],
+              hr(),
+              visualize_components[[4]],
+              hr(),
+              div(
+                class = "d-flex justify-content-between gap-2",
+                actionButton(ns("back_analysis"), "← Back"),
+                actionButton(ns("finish"), "Finish", class = "btn-success")
+              )
+            ),
+            mainPanel(
+              width = 8,
+              h4("Mean ± SE Plot"),
+              visualize_components[[5]]
             )
           )
-        )
+        }
       )
     )
   )
