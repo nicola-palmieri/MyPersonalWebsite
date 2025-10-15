@@ -7,14 +7,18 @@ library(broom)
 
 one_way_anova_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    uiOutput(ns("inputs")),
-    uiOutput(ns("level_order")),
-    br(),
-    actionButton(ns("run"), "Run ANOVA"),
-    br(), br(),
-    uiOutput(ns("summary_ui")),
-    uiOutput(ns("fixed_effects_ui"))
+  list(
+    config = tagList(
+      uiOutput(ns("inputs")),
+      uiOutput(ns("level_order")),
+      br(),
+      actionButton(ns("run"), "Run ANOVA")
+    ),
+    results = tagList(
+      uiOutput(ns("summary_ui")),
+      br(),
+      uiOutput(ns("fixed_effects_ui"))
+    )
   )
 }
 

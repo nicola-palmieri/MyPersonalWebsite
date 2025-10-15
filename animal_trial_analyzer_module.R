@@ -79,7 +79,9 @@ animal_trial_app_ui <- function(id) {
               h4("Step 3 — Analyze Results"),
               p("Choose the statistical approach that fits your trial design, then inspect the summaries on the right."),
               hr(),
-              analysis_components[[2]],
+              analysis_components$type_selector,
+              hr(),
+              analysis_components$config_panel,
               hr(),
               div(
                 class = "d-flex justify-content-between gap-2",
@@ -89,8 +91,8 @@ animal_trial_app_ui <- function(id) {
             ),
             mainPanel(
               width = 8,
-              h4("Analysis Configuration & Output"),
-              analysis_components[[3]]
+              h4("Analysis Results"),
+              analysis_components$results_panel
             )
           )
         }
