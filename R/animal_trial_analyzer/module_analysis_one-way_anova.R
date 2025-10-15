@@ -34,14 +34,12 @@ one_way_anova_server <- function(id, filtered_data) {
       num_cols <- names(data)[sapply(data, is.numeric)]
       cat_cols <- names(data)[sapply(data, function(x) is.character(x) || is.factor(x))]
       
-      selected_responses <- input$response
-
       response_input <- if (isTRUE(input$multi_resp)) {
         selectizeInput(
           ns("response"),
           "Response variables (numeric):",
           choices = num_cols,
-          selected = selected_responses,
+          selected = if (length(num_cols) > 0) num_cols[1] else NULL,
           multiple = TRUE,
           options = list(maxItems = 10)
         )
@@ -50,22 +48,12 @@ one_way_anova_server <- function(id, filtered_data) {
           ns("response"),
           "Response variable (numeric):",
           choices = num_cols,
-          selected = if (!is.null(selected_responses) && length(selected_responses) > 0) {
-            selected_responses[1]
-          } else if (length(num_cols) > 0) {
-            num_cols[1]
-          } else {
-            NULL
-          }
+          selected = if (length(num_cols) > 0) num_cols[1] else NULL
         )
       }
 
       tagList(
-        checkboxInput(
-          ns("multi_resp"),
-          "Enable multiple response variables",
-          value = isTRUE(input$multi_resp)
-        ),
+        checkboxInput(ns("multi_resp"), "Enable multiple response variables", value = FALSE),
         response_input,
         selectInput(
           ns("group"),
