@@ -34,12 +34,34 @@ one_way_anova_server <- function(id, filtered_data) {
       num_cols <- names(data)[sapply(data, is.numeric)]
       cat_cols <- names(data)[sapply(data, function(x) is.character(x) || is.factor(x))]
       
-      response_input <- if (isTRUE(input$multi_resp)) {
+      tagList(
+        # --- checkbox always exists ---
+        checkboxInput(ns("multi_resp"), "Enable multiple response variables", value = FALSE),
+        
+        # --- placeholder for response selector ---
+        uiOutput(ns("response_selector")),
+        
+        selectInput(
+          ns("group"),
+          "Grouping variable (factor):",
+          choices = cat_cols,
+          selected = if (length(cat_cols) > 0) cat_cols[1] else NULL
+        )
+      )
+    })
+    
+    # --- render response selector reactively ---
+    output$response_selector <- renderUI({
+      req(df())
+      data <- df()
+      num_cols <- names(data)[sapply(data, is.numeric)]
+      
+      if (isTRUE(input$multi_resp)) {
         selectizeInput(
           ns("response"),
           "Response variables (numeric):",
           choices = num_cols,
-          selected = if (length(num_cols) > 0) num_cols[1] else NULL,
+          selected = head(num_cols, 1),
           multiple = TRUE,
           options = list(maxItems = 10)
         )
@@ -51,18 +73,8 @@ one_way_anova_server <- function(id, filtered_data) {
           selected = if (length(num_cols) > 0) num_cols[1] else NULL
         )
       }
-
-      tagList(
-        checkboxInput(ns("multi_resp"), "Enable multiple response variables", value = FALSE),
-        response_input,
-        selectInput(
-          ns("group"),
-          "Grouping variable (factor):",
-          choices = cat_cols,
-          selected = if (length(cat_cols) > 0) cat_cols[1] else NULL
-        )
-      )
     })
+    
     
     # Level order selection
     output$level_order <- renderUI({

@@ -86,6 +86,12 @@ upload_server <- function(id) {
         error = function(e) e
       )
       
+      # Clean column names immediately after successful load
+      if (!inherits(tmp, "error")) {
+        tmp <- janitor::clean_names(tmp)
+      }
+      
+      
       if (inherits(tmp, "error")) {
         df(NULL)
         output$validation_msg <- renderText(

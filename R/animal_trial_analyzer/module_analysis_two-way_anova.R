@@ -32,30 +32,15 @@ two_way_anova_server <- function(id, filtered_data) {
     output$inputs <- renderUI({
       req(df())
       data <- df()
-      num_cols <- names(data)[sapply(data, is.numeric)]
       cat_cols <- names(data)[sapply(data, function(x) is.character(x) || is.factor(x))]
       
-      response_input <- if (isTRUE(input$multi_resp)) {
-        selectizeInput(
-          ns("response"),
-          "Response variables (numeric):",
-          choices = num_cols,
-          selected = if (length(num_cols) > 0) num_cols[1] else NULL,
-          multiple = TRUE,
-          options = list(maxItems = 10)
-        )
-      } else {
-        selectInput(
-          ns("response"),
-          "Response variable (numeric):",
-          choices = num_cols,
-          selected = if (length(num_cols) > 0) num_cols[1] else NULL
-        )
-      }
-
       tagList(
+        # checkbox always present
         checkboxInput(ns("multi_resp"), "Enable multiple response variables", value = FALSE),
-        response_input,
+        
+        # placeholder for the response selector that updates reactively
+        uiOutput(ns("response_selector")),
+        
         selectInput(
           ns("factor1"),
           "First factor (x-axis):",
@@ -70,6 +55,32 @@ two_way_anova_server <- function(id, filtered_data) {
         )
       )
     })
+    
+    # --- reactive response selector ---
+    output$response_selector <- renderUI({
+      req(df())
+      data <- df()
+      num_cols <- names(data)[sapply(data, is.numeric)]
+      
+      if (isTRUE(input$multi_resp)) {
+        selectizeInput(
+          ns("response"),
+          "Response variables (numeric):",
+          choices = num_cols,
+          selected = head(num_cols, 1),
+          multiple = TRUE,
+          options = list(maxItems = 10)
+        )
+      } else {
+        selectInput(
+          ns("response"),
+          "Response variable (numeric):",
+          choices = num_cols,
+          selected = if (length(num_cols) > 0) num_cols[1] else NULL
+        )
+      }
+    })
+    
     
     # ----------------------------------------------
     # Level order selectors for both factors

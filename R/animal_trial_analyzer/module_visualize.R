@@ -37,23 +37,17 @@ visualize_ui <- function(id) {
     fluidRow(
       column(
         width = 6,
-        numericInput(
-          ns("grid_rows"),
-          label = "Grid rows (optional)",
-          value = NA,
-          min = 1,
-          step = 1
-        )
+        numericInput(ns("grid_rows"),
+                     label = "Grid rows (optional)",
+                     value = 0,        # 0 means auto
+                     min = 0, step = 1)
       ),
       column(
         width = 6,
-        numericInput(
-          ns("grid_cols"),
-          label = "Grid columns (optional)",
-          value = NA,
-          min = 1,
-          step = 1
-        )
+        numericInput(ns("grid_cols"),
+                     label = "Grid columns (optional)",
+                     value = 0,        # 0 means auto
+                     min = 0, step = 1)
       )
     ),
     downloadButton(ns("download_plot"), "Download PNG (300 dpi)"),
@@ -166,15 +160,12 @@ visualize_server <- function(id, filtered_data, model_fit) {
       }
 
       n <- length(plots)
-      n_row <- input$grid_rows
-      n_col <- input$grid_cols
-
-      if (is.null(n_row) || is.na(n_row) || n_row < 1) {
-        n_row <- ceiling(sqrt(n))
-      }
-      if (is.null(n_col) || is.na(n_col) || n_col < 1) {
-        n_col <- ceiling(n / n_row)
-      }
+      n_row <- suppressWarnings(as.numeric(input$grid_rows))
+      n_col <- suppressWarnings(as.numeric(input$grid_cols))
+      
+      if (is.na(n_row) || n_row < 1) n_row <- ceiling(sqrt(n))
+      if (is.na(n_col) || n_col < 1) n_col <- ceiling(n / n_row)
+      
 
       patchwork::wrap_plots(plotlist = plots, nrow = n_row, ncol = n_col)
     })

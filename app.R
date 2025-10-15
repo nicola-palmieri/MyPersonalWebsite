@@ -4,6 +4,7 @@ library(readxl)
 library(DT)
 library(tools)
 library(broom)
+library(janitor)
 
 options(shiny.autoreload = TRUE)
 
