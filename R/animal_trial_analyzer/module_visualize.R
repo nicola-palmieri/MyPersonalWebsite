@@ -59,7 +59,7 @@ visualize_server <- function(id, filtered_data, model_fit) {
       stats <- summary_stats()
       grp <- vars()$group
       
-      ggplot(stats, aes_string(x = grp, y = "mean", group = "1")) +
+      ggplot(stats, aes(x = !!sym(grp), y = mean, group = 1)) +
         geom_line(color = "steelblue", linewidth = 1) +
         geom_point(size = 3, color = "steelblue") +
         geom_errorbar(aes(ymin = mean - se, ymax = mean + se),

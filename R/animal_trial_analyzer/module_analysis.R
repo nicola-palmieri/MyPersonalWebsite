@@ -43,6 +43,7 @@ analysis_server <- function(id, filtered_data) {
     model_fit <- reactiveVal(NULL)
 
     observeEvent(input$analysis_type, {
+      req(input$analysis_type)
       if (input$analysis_type == "One-way ANOVA") {
         model_fit(one_way_anova_server("anova", df))
       } else {
