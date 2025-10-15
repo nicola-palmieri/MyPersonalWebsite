@@ -73,54 +73,24 @@ animal_trial_app_ui <- function(id) {
         title = "3️⃣ Analyze",
         {
           analysis_components <- analysis_ui(ns("analysis"))
-          tagList(
-            sidebarLayout(
-              sidebarPanel(
-                width = 4,
-                h4("Step 3 — Analyze Results"),
-                p("Choose the statistical approach that fits your trial design, configure the model, then review the outputs to the right."),
-                hr(),
-                h5("Analysis Configuration"),
-                analysis_components[[2]],
-                hr(),
-                div(
-                  id = ns("analysis_controls_placeholder"),
-                  class = "analysis-controls"
-                ),
-                hr(),
-                div(
-                  class = "d-flex justify-content-between gap-2",
-                  actionButton(ns("back_filter"), "← Back"),
-                  actionButton(ns("go_visualize"), "Continue →", class = "btn-primary")
-                )
-              ),
-              mainPanel(
-                width = 8,
-                h4("Analysis Results"),
-                div(
-                  id = ns("analysis_outputs_container"),
-                  class = "analysis-results",
-                  analysis_components[[3]]
-                )
+          sidebarLayout(
+            sidebarPanel(
+              width = 4,
+              h4("Step 3 — Analyze Results"),
+              p("Choose the statistical approach that fits your trial design, then inspect the summaries on the right."),
+              hr(),
+              analysis_components[[2]],
+              hr(),
+              div(
+                class = "d-flex justify-content-between gap-2",
+                actionButton(ns("back_filter"), "← Back"),
+                actionButton(ns("go_visualize"), "Continue →", class = "btn-primary")
               )
             ),
-            tags$style(
-              HTML(
-                paste0(
-                  "#", ns("analysis_controls_placeholder"), " > * { margin-bottom: 12px; }",
-                  "#", ns("analysis_controls_placeholder"), " > *:last-child { margin-bottom: 0; }"
-                )
-              )
-            ),
-            tags$script(
-              HTML(
-                sprintf(
-                  "(function(){\n                     var controlsId = '%s';\n                     var outputsId = '%s';\n                     function relocateAnalysisElements(){\n                       var $controls = $('#'+controlsId);\n                       var $outputs = $('#'+outputsId);\n                       if(!$controls.length || !$outputs.length){ return; }\n                       var baseId = outputsId.replace(/-analysis_outputs_container$/, '');\n                       var knownControlIds = [\n                         baseId + '-anova_one-inputs',\n                         baseId + '-anova_one-level_order',\n                         baseId + '-anova_one-run',\n                         baseId + '-anova_two-inputs',\n                         baseId + '-anova_two-level_order_1',\n                         baseId + '-anova_two-level_order_2',\n                         baseId + '-anova_two-run'\n                       ];\n                       var escapeSelector = function(id){\n                         return id.replace(/([:\\.[\\],=:@])/g, '\\\\$1');\n                       };\n                       knownControlIds.forEach(function(id){\n                         var selector = '#' + escapeSelector(id);\n                         var $existing = $(selector);\n                         if($existing.length && $existing.closest('#'+controlsId).length){\n                           $existing.remove();\n                         }\n                       });\n                       var controlPattern = /(inputs|level_order|level_order_1|level_order_2)$/;\n                       $outputs.find('[id]').filter(function(){\n                         var id = this.id || '';\n                         return controlPattern.test(id);\n                       }).each(function(){\n                         var $el = $(this);\n                         if(!$el.closest('#'+controlsId).length){\n                           $el.appendTo($controls);\n                         }\n                       });\n                       $outputs.find('[id]').filter(function(){\n                         var id = this.id || '';\n                         return /-run$/.test(id);\n                       }).each(function(){\n                         var $el = $(this);\n                         if(!$el.closest('#'+controlsId).length){\n                           $el.appendTo($controls);\n                         }\n                       });\n                       $controls.find('br').remove();\n                       $outputs.children('br').slice(0, 2).remove();\n                     }\n                     function scheduleRelocate(){ setTimeout(relocateAnalysisElements, 75); }\n                     $(document).on('shiny:value', function(event){\n                       var id = event.target && event.target.id ? event.target.id : '';\n                       if(id.endsWith('analysis_panel') || id.endsWith('analysis_type')){\n                         scheduleRelocate();\n                       }\n                     });\n                     $(document).on('shiny:inputchanged', function(event){\n                       if((event.name || '').endsWith('analysis_type')){\n                         scheduleRelocate();\n                       }\n                     });\n                     $(document).on('shiny:sessioninitialized', function(){ scheduleRelocate(); });\n                     $(document).ready(function(){ scheduleRelocate(); });\n                   })();",
-                  ns("analysis_controls_placeholder"),
-                  ns("analysis_outputs_container")
-                )
-              )
-            )
+            mainPanel(
+              width = 8,
+              h4("Analysis Configuration & Output"),
+              analysis_components[[3]]
             )
           )
         }
