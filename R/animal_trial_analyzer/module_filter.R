@@ -43,11 +43,42 @@ filter_server <- function(id, uploaded_data) {
       isolate(updateSelectInput(session, "columns", selected = cols))
       if (length(cols) == 0) return(NULL)
       
+      compute_step <- function(values) {
+        rng <- range(values, na.rm = TRUE)
+        span <- diff(rng)
+
+        if (!is.finite(span) || span == 0) {
+          reference <- suppressWarnings(max(abs(rng), na.rm = TRUE))
+          if (!is.finite(reference) || reference == 0) {
+            return(0.1)
+          }
+          exponent <- floor(log10(reference)) - 1
+          return(10 ^ exponent)
+        }
+
+        raw_step <- span / 100
+        exponent <- floor(log10(raw_step))
+        base <- 10 ^ exponent
+        multipliers <- c(1, 2, 5, 10)
+
+        step <- base * tail(multipliers, 1)
+        for (m in multipliers) {
+          candidate <- base * m
+          if (raw_step <= candidate) {
+            step <- candidate
+            break
+          }
+        }
+
+        max(step, .Machine$double.eps)
+      }
+
       widgets <- lapply(cols, function(col) {
         col_data <- df()[[col]]
-        
+
         if (is.numeric(col_data)) {
           rng <- range(col_data, na.rm = TRUE)
+          step <- compute_step(col_data)
           fluidRow(
             column(
               width = 6,
@@ -57,7 +88,7 @@ filter_server <- function(id, uploaded_data) {
                 value = rng[1],
                 min = rng[1],
                 max = rng[2],
-                step = diff(rng) / 100
+                step = step
               )
             ),
             column(
@@ -68,7 +99,7 @@ filter_server <- function(id, uploaded_data) {
                 value = rng[2],
                 min = rng[1],
                 max = rng[2],
-                step = diff(rng) / 100
+                step = step
               )
             )
           )
