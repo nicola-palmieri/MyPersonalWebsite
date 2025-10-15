@@ -3,7 +3,8 @@
 # ===============================================================
 library(shiny)
 
-source("R/animal_trial_analyzer/module_analysis_anova.R")
+source("R/animal_trial_analyzer/module_analysis_one-way_anova.R")
+source("R/animal_trial_analyzer/module_analysis_two-way_anova.R")
 source("R/animal_trial_analyzer/module_analysis_utils.R")
 
 analysis_ui <- function(id) {
@@ -13,7 +14,7 @@ analysis_ui <- function(id) {
     selectInput(
       ns("analysis_type"),
       "Select analysis type:",
-      choices = c("One-way ANOVA"),  # more will be added here later
+      choices = c("One-way ANOVA", "Two-way ANOVA"),  # more will be added here later
       selected = "One-way ANOVA"
     ),
     uiOutput(ns("analysis_panel"))
@@ -33,11 +34,14 @@ analysis_server <- function(id, filtered_data) {
     output$analysis_panel <- renderUI({
       req(input$analysis_type)
       if (input$analysis_type == "One-way ANOVA") {
-        one_way_anova_ui(ns("anova"))
+        one_way_anova_ui(ns("anova_one"))
+      } else if (input$analysis_type == "Two-way ANOVA") {
+        two_way_anova_ui(ns("anova_two"))
       } else {
         p("Analysis type not implemented yet.")
       }
     })
+    
     
     # Dynamically run submodule
     model_fit <- reactiveVal(NULL)
@@ -45,11 +49,14 @@ analysis_server <- function(id, filtered_data) {
     observeEvent(input$analysis_type, {
       req(input$analysis_type)
       if (input$analysis_type == "One-way ANOVA") {
-        model_fit(one_way_anova_server("anova", df))
+        model_fit(one_way_anova_server("anova_one", df))
+      } else if (input$analysis_type == "Two-way ANOVA") {
+        model_fit(two_way_anova_server("anova_two", df))
       } else {
         model_fit(NULL)
       }
     }, ignoreNULL = FALSE)
+    
 
     # Expose a reactive that yields the fitted model object once available
     reactive({

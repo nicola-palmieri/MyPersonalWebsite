@@ -15,22 +15,22 @@ visualize_ui <- function(id) {
         width = 6,
         numericInput(
           ns("plot_width"),
-          label = "Plot width (px)",
-          value = 800,
-          min = 300,
-          max = 2400,
-          step = 50
+          label = "Plot width (inches)",
+          value = 8,
+          min = 3,
+          max = 24,
+          step = 0.5
         )
       ),
       column(
         width = 6,
         numericInput(
           ns("plot_height"),
-          label = "Plot height (px)",
-          value = 450,
-          min = 300,
-          max = 1600,
-          step = 50
+          label = "Plot height (inches)",
+          value = 4.5,
+          min = 3,
+          max = 16,
+          step = 0.5
         )
       )
     ),
@@ -55,8 +55,17 @@ visualize_server <- function(id, filtered_data, model_fit) {
       req(model_fit())
       form <- formula(model_fit())
       all_vars <- all.vars(form)
-      list(response = all_vars[1], group = all_vars[2])
+      
+      # Handle one-way or two-way formulas
+      if (length(all_vars) == 2) {
+        list(response = all_vars[1], factor1 = all_vars[2], factor2 = NULL)
+      } else if (length(all_vars) == 3) {
+        list(response = all_vars[1], factor1 = all_vars[2], factor2 = all_vars[3])
+      } else {
+        stop("Unsupported model structure.")
+      }
     })
+    
     
     # -----------------------------------------------------------
     # Compute summary statistics
@@ -65,16 +74,30 @@ visualize_server <- function(id, filtered_data, model_fit) {
       req(df(), vars())
       data <- df()
       resp <- vars()$response
-      grp <- vars()$group
+      f1 <- vars()$factor1
+      f2 <- vars()$factor2
       
-      data |>
-        group_by(.data[[grp]]) |>
-        summarise(
-          mean = mean(.data[[resp]], na.rm = TRUE),
-          se = sd(.data[[resp]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp]]))),
-          .groups = "drop"
-        )
+      if (is.null(f2)) {
+        # One-way ANOVA
+        data |>
+          group_by(.data[[f1]]) |>
+          summarise(
+            mean = mean(.data[[resp]], na.rm = TRUE),
+            se = sd(.data[[resp]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp]]))),
+            .groups = "drop"
+          )
+      } else {
+        # Two-way ANOVA
+        data |>
+          group_by(.data[[f1]], .data[[f2]]) |>
+          summarise(
+            mean = mean(.data[[resp]], na.rm = TRUE),
+            se = sd(.data[[resp]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp]]))),
+            .groups = "drop"
+          )
+      }
     })
+    
     
     # -----------------------------------------------------------
     # Plot mean ± SE
@@ -82,20 +105,47 @@ visualize_server <- function(id, filtered_data, model_fit) {
     plot_obj <- reactive({
       req(summary_stats(), vars())
       stats <- summary_stats()
-      grp <- vars()$group
-
-      ggplot(stats, aes(x = !!sym(grp), y = mean, group = 1)) +
-        geom_line(color = "steelblue", linewidth = 1) +
-        geom_point(size = 3, color = "steelblue") +
-        geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
-                      width = 0.15, color = "gray40") +
-        theme_minimal(base_size = 14) +
-        labs(x = grp, y = "Mean ± SE") +
-        theme(
-          panel.grid.minor = element_blank(),
-          panel.grid.major.x = element_blank()
-        )
+      f1 <- vars()$factor1
+      f2 <- vars()$factor2
+      
+      if (is.null(f2)) {
+        # One-way plot (same as before)
+        ggplot(stats, aes(x = !!sym(f1), y = mean, group = 1)) +
+          geom_line(color = "steelblue", linewidth = 1) +
+          geom_point(size = 3, color = "steelblue") +
+          geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                        width = 0.15, color = "gray40") +
+          theme_minimal(base_size = 14) +
+          labs(x = f1, y = "Mean ± SE") +
+          theme(
+            panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank()
+          )
+      } else {
+        # Two-way plot (factor1 on x-axis, factor2 as color)
+        ggplot(stats, aes(
+          x = !!sym(f1),
+          y = mean,
+          color = !!sym(f2),
+          group = !!sym(f2)
+        )) +
+          geom_line(linewidth = 1) +
+          geom_point(size = 3) +
+          geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                        width = 0.15) +
+          theme_minimal(base_size = 14) +
+          labs(
+            x = f1,
+            y = "Mean ± SE",
+            color = f2
+          ) +
+          theme(
+            panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank()
+          )
+      }
     })
+    
 
     output$mean_se_plot <- renderPlot({
       req(plot_obj())

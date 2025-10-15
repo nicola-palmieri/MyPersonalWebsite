@@ -3,6 +3,7 @@ library(bslib)
 library(readxl)
 library(DT)
 library(tools)
+library(broom)
 
 options(shiny.autoreload = TRUE)
 
