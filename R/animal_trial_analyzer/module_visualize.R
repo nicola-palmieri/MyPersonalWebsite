@@ -151,8 +151,8 @@ visualize_server <- function(id, filtered_data, model_fit) {
       req(plot_obj())
       plot_obj()
     },
-    width = function() input$plot_width,
-    height = function() input$plot_height,
+    width = function() input$plot_width * 96,
+    height = function() input$plot_height * 96,
     res = 96)
 
     output$download_plot <- downloadHandler(
@@ -161,8 +161,8 @@ visualize_server <- function(id, filtered_data, model_fit) {
       },
       content = function(file) {
         req(plot_obj(), input$plot_width, input$plot_height)
-        width_in <- input$plot_width / 300
-        height_in <- input$plot_height / 300
+        width_in <- input$plot_width
+        height_in <- input$plot_height
         ggsave(
           filename = file,
           plot = plot_obj(),
