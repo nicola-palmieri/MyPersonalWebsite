@@ -2,6 +2,11 @@
 # 🧪 Animal Trial Analyzer — Two-way ANOVA Module
 # ===============================================================
 
+library(shiny)
+library(DT)
+library(broom)
+library(officer)
+library(flextable)
 
 two_way_anova_ui <- function(id) {
   ns <- NS(id)
@@ -155,32 +160,30 @@ two_way_anova_server <- function(id, filtered_data) {
 
       responses <- model_info$responses
 
-      if (length(responses) == 1) {
-        verbatimTextOutput(ns("summary_single"))
-      } else {
-        tabs <- lapply(seq_along(responses), function(i) {
-          tabPanel(responses[i], verbatimTextOutput(ns(paste0("summary_", i))))
-        })
-        do.call(tabsetPanel, c(list(id = ns("summary_tabs")), tabs))
-      }
+      tabs <- lapply(seq_along(responses), function(i) {
+        tabPanel(
+          title = responses[i],
+          tags$div(
+            tags$details(
+              open = FALSE,
+              tags$summary(strong("R Output")),
+              verbatimTextOutput(ns(paste0("summary_", i)))
+            ),
+            br(),
+            h4("Coefficient Table"),
+            DTOutput(ns(paste0("fixed_effects_", i))),
+            br(),
+            h4("Download Results"),
+            downloadButton(ns(paste0("download_", i)), "Download Results (Word)")
+          )
+        )
+      })
+
+      do.call(tabsetPanel, c(list(id = ns("results_tabs")), tabs))
     })
 
     output$fixed_effects_ui <- renderUI({
-      model_info <- models()
-      if (is.null(model_info)) {
-        return(NULL)
-      }
-
-      responses <- model_info$responses
-
-      if (length(responses) == 1) {
-        DTOutput(ns("fixed_effects_single"))
-      } else {
-        tabs <- lapply(seq_along(responses), function(i) {
-          tabPanel(responses[i], DTOutput(ns(paste0("fixed_effects_", i))))
-        })
-        do.call(tabsetPanel, c(list(id = ns("fixed_effects_tabs")), tabs))
-      }
+      NULL
     })
 
     observeEvent(models(), {
@@ -192,36 +195,61 @@ two_way_anova_server <- function(id, filtered_data) {
       responses <- model_info$responses
       model_list <- model_info$models
 
-      if (length(responses) == 1) {
-        resp <- responses[1]
-        output$summary_single <- renderPrint({
-          summary(model_list[[resp]])
-        })
-        output$fixed_effects_single <- renderDT({
-          datatable(
-            broom::tidy(model_list[[resp]]),
-            options = list(scrollX = TRUE, pageLength = 5),
-            rownames = FALSE
+      for (i in seq_along(responses)) {
+        resp <- responses[i]
+        local({
+          idx <- i
+          response_name <- resp
+          model_obj <- model_list[[response_name]]
+
+          tidy_df <- broom::tidy(model_obj)
+          numeric_cols <- vapply(tidy_df, is.numeric, logical(1))
+          tidy_df[numeric_cols] <- lapply(tidy_df[numeric_cols], function(x) round(x, 4))
+
+          output[[paste0("summary_", idx)]] <- renderPrint({
+            summary(model_obj)
+          })
+
+          output[[paste0("fixed_effects_", idx)]] <- renderDT({
+            datatable(
+              tidy_df,
+              options = list(scrollX = TRUE, pageLength = 5),
+              rownames = FALSE
+            )
+          })
+
+          output[[paste0("download_", idx)]] <- downloadHandler(
+            filename = function() {
+              safe_resp <- gsub("[^A-Za-z0-9]+", "_", response_name)
+              safe_resp <- gsub("_+", "_", safe_resp)
+              safe_resp <- gsub("^_|_$", "", safe_resp)
+              if (!nzchar(safe_resp)) {
+                safe_resp <- paste0("response_", idx)
+              }
+              paste0("anova_results_", safe_resp, "_", Sys.Date(), ".docx")
+            },
+            content = function(file) {
+              tidy_export <- broom::tidy(model_obj)
+              numeric_cols_export <- vapply(tidy_export, is.numeric, logical(1))
+              tidy_export[numeric_cols_export] <- lapply(tidy_export[numeric_cols_export], function(x) round(x, 4))
+
+              doc <- officer::read_docx()
+              doc <- officer::body_add_par(doc, paste("ANOVA results for:", response_name), style = "heading 1")
+              doc <- officer::body_add_par(doc, paste("Model formula:", format(formula(model_obj))), style = "heading 2")
+              doc <- officer::body_add_par(doc, "R Output", style = "heading 2")
+              summary_lines <- capture.output(summary(model_obj))
+              for (line in summary_lines) {
+                doc <- officer::body_add_par(doc, line, style = "Normal")
+              }
+              doc <- officer::body_add_par(doc, "Coefficient Table", style = "heading 2")
+              ft <- flextable::flextable(tidy_export)
+              ft <- flextable::autofit(ft)
+              doc <- officer::body_add_flextable(doc, ft)
+
+              officer::print(doc, target = file)
+            }
           )
         })
-      } else {
-        for (i in seq_along(responses)) {
-          resp <- responses[i]
-          local({
-            idx <- i
-            response_name <- resp
-            output[[paste0("summary_", idx)]] <- renderPrint({
-              summary(model_list[[response_name]])
-            })
-            output[[paste0("fixed_effects_", idx)]] <- renderDT({
-              datatable(
-                broom::tidy(model_list[[response_name]]),
-                options = list(scrollX = TRUE, pageLength = 5),
-                rownames = FALSE
-              )
-            })
-          })
-        }
       }
     })
 
