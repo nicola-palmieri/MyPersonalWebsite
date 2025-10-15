@@ -5,15 +5,19 @@
 
 two_way_anova_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    uiOutput(ns("inputs")),
-    uiOutput(ns("level_order_1")),
-    uiOutput(ns("level_order_2")),
-    br(),
-    actionButton(ns("run"), "Run Two-way ANOVA"),
-    br(), br(),
-    uiOutput(ns("summary_ui")),
-    uiOutput(ns("fixed_effects_ui"))
+  list(
+    config = tagList(
+      uiOutput(ns("inputs")),
+      uiOutput(ns("level_order_1")),
+      uiOutput(ns("level_order_2")),
+      br(),
+      actionButton(ns("run"), "Run Two-way ANOVA")
+    ),
+    results = tagList(
+      uiOutput(ns("summary_ui")),
+      br(),
+      uiOutput(ns("fixed_effects_ui"))
+    )
   )
 }
 

@@ -9,15 +9,16 @@ source("R/animal_trial_analyzer/module_analysis_utils.R")
 
 analysis_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    h4("3. Statistical Analysis"),
-    selectInput(
+  list(
+    heading = h4("3. Statistical Analysis"),
+    type_selector = selectInput(
       ns("analysis_type"),
       "Select analysis type:",
       choices = c("One-way ANOVA", "Two-way ANOVA"),  # more will be added here later
       selected = "One-way ANOVA"
     ),
-    uiOutput(ns("analysis_panel"))
+    config_panel = uiOutput(ns("config_panel")),
+    results_panel = uiOutput(ns("results_panel"))
   )
 }
 
@@ -30,16 +31,30 @@ analysis_server <- function(id, filtered_data) {
       filtered_data()
     })
     
-    # Dynamically show the correct submodule based on selection
-    output$analysis_panel <- renderUI({
+    current_module_ui <- reactive({
       req(input$analysis_type)
       if (input$analysis_type == "One-way ANOVA") {
         one_way_anova_ui(ns("anova_one"))
       } else if (input$analysis_type == "Two-way ANOVA") {
         two_way_anova_ui(ns("anova_two"))
       } else {
-        p("Analysis type not implemented yet.")
+        list(
+          config = p("Analysis type not implemented yet."),
+          results = p("Analysis type not implemented yet.")
+        )
       }
+    })
+
+    output$config_panel <- renderUI({
+      ui <- current_module_ui()
+      req(ui$config)
+      ui$config
+    })
+
+    output$results_panel <- renderUI({
+      ui <- current_module_ui()
+      req(ui$results)
+      ui$results
     })
     
     
