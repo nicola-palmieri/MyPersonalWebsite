@@ -10,14 +10,13 @@ source("R/animal_trial_analyzer/module_visualize.R")
 animal_trial_app_ui <- function(id) {
   ns <- NS(id)
   fluidPage(
-    titlePanel("🧪 Animal Trial Analyzer"),
+    h3("Animal Trial Analyzer"),
     tabsetPanel(
       id = ns("main_tabs"),
       tabPanel(
         title = "1️⃣ Upload",
         div(
           class = "pt-3",
-          h3("Step 1: Upload Data"),
           upload_ui(ns("upload")),
           div(
             style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
@@ -30,7 +29,6 @@ animal_trial_app_ui <- function(id) {
         title = "2️⃣ Filter",
         div(
           class = "pt-3",
-          h3("Step 2: Filter & Prepare"),
           filter_ui(ns("filter")),
           div(
             style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
@@ -43,7 +41,6 @@ animal_trial_app_ui <- function(id) {
         title = "3️⃣ Analyze",
         div(
           class = "pt-3",
-          h3("Step 3: Analyze Results"),
           analysis_ui(ns("analysis")),
           div(
             style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px;",
@@ -56,7 +53,6 @@ animal_trial_app_ui <- function(id) {
         title = "4️⃣ Visualize",
         div(
           class = "pt-3",
-          h3("Step 4: Visualize & Share"),
           visualize_ui(ns("visualize")),
           div(
             style = "display: flex; justify-content: space-between; align-items: center; margin-top: 16px; gap: 8px;",
