@@ -48,38 +48,46 @@ visualize_server <- function(id, filtered_data, model_fit) {
       model_fit()
     })
     
-    compute_layout <- function(n_items, rows_input, cols_input, default_rows = NULL) {
-      if (is.null(n_items) || n_items <= 0) {
+    compute_layout <- function(n_items, rows_input, cols_input) {
+      # Safely handle nulls
+      if (is.null(n_items) || length(n_items) == 0 || is.na(n_items) || n_items <= 0) {
         return(list(nrow = 1, ncol = 1))
       }
-
+      
+      # Replace NULL or NA inputs with 0
+      if (is.null(rows_input) || is.na(rows_input)) rows_input <- 0
+      if (is.null(cols_input) || is.na(cols_input)) cols_input <- 0
+      
       n_row_input <- suppressWarnings(as.numeric(rows_input))
       n_col_input <- suppressWarnings(as.numeric(cols_input))
-
-      if (!is.na(n_row_input) && n_row_input > 0) {
+      
+      # Handle invalid inputs
+      if (is.na(n_row_input)) n_row_input <- 0
+      if (is.na(n_col_input)) n_col_input <- 0
+      
+      if (n_row_input > 0) {
         n_row_final <- n_row_input
-        if (!is.na(n_col_input) && n_col_input > 0) {
+        if (n_col_input > 0) {
           n_col_final <- max(n_col_input, ceiling(n_items / max(1, n_row_final)))
         } else {
           n_col_final <- ceiling(n_items / max(1, n_row_final))
         }
-      } else if (!is.na(n_col_input) && n_col_input > 0) {
+      } else if (n_col_input > 0) {
         n_col_final <- n_col_input
         n_row_final <- ceiling(n_items / max(1, n_col_final))
       } else {
-        if (is.null(default_rows)) {
-          n_row_final <- ceiling(sqrt(n_items))
-        } else {
-          n_row_final <- default_rows(n_items)
-        }
-        n_col_final <- ceiling(n_items / max(1, n_row_final))
+        # Default heuristic: single row if <=5 items, otherwise two
+        n_row_final <- ifelse(n_items <= 5, 1, 2)
+        n_col_final <- ceiling(n_items / n_row_final)
       }
-
-      n_row_final <- max(1, as.integer(n_row_final))
-      n_col_final <- max(1, as.integer(n_col_final))
-
-      list(nrow = n_row_final, ncol = n_col_final)
+      
+      list(
+        nrow = max(1, as.integer(n_row_final)),
+        ncol = max(1, as.integer(n_col_final))
+      )
     }
+    
+    
 
     output$layout_controls <- renderUI({
       info <- model_info()
@@ -250,60 +258,60 @@ visualize_server <- function(id, filtered_data, model_fit) {
           p <- p + scale_y_continuous(limits = y_limits)
         }
 
-        p + ggtitle(title_text)
+        p + ggtitle(title_text) +
+          theme(plot.title = element_text(size = 12, face = "bold"))
       }
 
       for (resp in responses) {
         if (has_strata) {
           stratum_plots <- list()
           y_values <- c()
-
+          
           for (stratum in strata_levels) {
             subset_data <- data[!is.na(data[[strat_var]]) & data[[strat_var]] == stratum, , drop = FALSE]
-            if (nrow(subset_data) == 0) {
-              next
-            }
-
+            if (nrow(subset_data) == 0) next
+            
             stats_df <- compute_stats(subset_data, resp)
-            if (nrow(stats_df) == 0) {
-              next
-            }
-
+            if (nrow(stats_df) == 0) next
+            
             y_values <- c(y_values, stats_df$mean - stats_df$se, stats_df$mean + stats_df$se)
             stratum_plots[[stratum]] <- stats_df
           }
-
-          if (length(stratum_plots) == 0) {
-            next
-          }
-
+          
+          if (length(stratum_plots) == 0) next
+          
           y_limits <- range(y_values, na.rm = TRUE)
-          if (!all(is.finite(y_limits))) {
-            y_limits <- NULL
-          }
-
+          if (!all(is.finite(y_limits))) y_limits <- NULL
+          
           strata_plot_list <- lapply(names(stratum_plots), function(stratum_name) {
             build_plot(stratum_plots[[stratum_name]], stratum_name, y_limits)
           })
-
-          layout <- compute_layout(
-            length(strata_plot_list),
-            input$strata_rows,
-            input$strata_cols,
-            default_strata_rows
-          )
-
+          
+          layout <- compute_layout(length(strata_plot_list), input$strata_rows, input$strata_cols)
+          
           max_strata_rows <- max(max_strata_rows, layout$nrow)
           max_strata_cols <- max(max_strata_cols, layout$ncol)
-
+          
+          # First build the grid of strata plots
           combined <- patchwork::wrap_plots(
             plotlist = strata_plot_list,
             nrow = layout$nrow,
             ncol = layout$ncol
-          ) +
-            patchwork::plot_annotation(title = resp)
-
-          response_plots[[resp]] <- combined
+          )
+          
+          
+          # ✅ robust: make a real title plot and stack it above the grid
+          title_plot <- ggplot() +
+            theme_void() +
+            ggtitle(resp) +
+            theme(
+              plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+              plot.margin = margin(t = 0, r = 0, b = 6, l = 0)
+            )
+          
+          # stack: title on top (small height), grid below (full height)
+          response_plots[[resp]] <- title_plot / combined + plot_layout(heights = c(0.08, 1))
+          
         } else {
           stats_df <- compute_stats(data, resp)
           if (nrow(stats_df) == 0) {
@@ -326,20 +334,18 @@ visualize_server <- function(id, filtered_data, model_fit) {
         return(NULL)
       }
 
-      resp_layout <- compute_layout(
-        length(response_plots),
-        if (!is.null(input$resp_rows)) input$resp_rows else 0,
-        if (!is.null(input$resp_cols)) input$resp_cols else 0
-      )
+      resp_layout <- compute_layout(length(response_plots), input$resp_rows, input$resp_cols)
 
       final_plot <- if (length(response_plots) == 1) {
         response_plots[[1]]
       } else {
+        # Preserve each response's patchwork title
         patchwork::wrap_plots(
           plotlist = response_plots,
           nrow = resp_layout$nrow,
           ncol = resp_layout$ncol
-        )
+        ) &
+          patchwork::plot_layout(guides = "collect")
       }
 
       list(
