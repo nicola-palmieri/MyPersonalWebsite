@@ -353,11 +353,7 @@ one_way_anova_server <- function(id, filtered_data) {
           tabPanel(
             title = responses[i],
             tags$div(
-              tags$details(
-                open = FALSE,
-                tags$summary(strong("R Output")),
-                verbatimTextOutput(ns(paste0("summary_", i)))
-              ),
+              verbatimTextOutput(ns(paste0("summary_", i))),
               br(),
               h4("Coefficient Table"),
               DTOutput(ns(paste0("fixed_effects_", i))),
