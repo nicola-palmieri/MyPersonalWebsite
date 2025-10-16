@@ -86,8 +86,98 @@ visualize_server <- function(id, filtered_data, model_fit) {
         ncol = max(1, as.integer(n_col_final))
       )
     }
-    
-    
+
+
+    layout_overrides <- reactiveValues(
+      strata_rows = 0,
+      strata_cols = 0,
+      resp_rows = 0,
+      resp_cols = 0
+    )
+
+    layout_manual <- reactiveValues(
+      strata_rows = FALSE,
+      strata_cols = FALSE,
+      resp_rows = FALSE,
+      resp_cols = FALSE
+    )
+
+    suppress_updates <- reactiveValues(
+      strata_rows = TRUE,
+      strata_cols = TRUE,
+      resp_rows = TRUE,
+      resp_cols = TRUE
+    )
+
+    observeEvent(input$strata_rows, {
+      if (isTRUE(suppress_updates$strata_rows)) {
+        suppress_updates$strata_rows <- FALSE
+        return()
+      }
+      val <- suppressWarnings(as.numeric(input$strata_rows))
+      if (is.na(val) || val <= 0) {
+        layout_overrides$strata_rows <- 0
+        layout_manual$strata_rows <- FALSE
+      } else {
+        layout_overrides$strata_rows <- as.integer(val)
+        layout_manual$strata_rows <- TRUE
+      }
+    })
+
+    observeEvent(input$strata_cols, {
+      if (isTRUE(suppress_updates$strata_cols)) {
+        suppress_updates$strata_cols <- FALSE
+        return()
+      }
+      val <- suppressWarnings(as.numeric(input$strata_cols))
+      if (is.na(val) || val <= 0) {
+        layout_overrides$strata_cols <- 0
+        layout_manual$strata_cols <- FALSE
+      } else {
+        layout_overrides$strata_cols <- as.integer(val)
+        layout_manual$strata_cols <- TRUE
+      }
+    })
+
+    observeEvent(input$resp_rows, {
+      if (isTRUE(suppress_updates$resp_rows)) {
+        suppress_updates$resp_rows <- FALSE
+        return()
+      }
+      val <- suppressWarnings(as.numeric(input$resp_rows))
+      if (is.na(val) || val <= 0) {
+        layout_overrides$resp_rows <- 0
+        layout_manual$resp_rows <- FALSE
+      } else {
+        layout_overrides$resp_rows <- as.integer(val)
+        layout_manual$resp_rows <- TRUE
+      }
+    })
+
+    observeEvent(input$resp_cols, {
+      if (isTRUE(suppress_updates$resp_cols)) {
+        suppress_updates$resp_cols <- FALSE
+        return()
+      }
+      val <- suppressWarnings(as.numeric(input$resp_cols))
+      if (is.na(val) || val <= 0) {
+        layout_overrides$resp_cols <- 0
+        layout_manual$resp_cols <- FALSE
+      } else {
+        layout_overrides$resp_cols <- as.integer(val)
+        layout_manual$resp_cols <- TRUE
+      }
+    })
+
+    effective_input <- function(name) {
+      if (isTRUE(layout_manual[[name]])) {
+        layout_overrides[[name]]
+      } else {
+        0
+      }
+    }
+
+
 
     output$layout_controls <- renderUI({
       info <- model_info()
@@ -103,7 +193,10 @@ visualize_server <- function(id, filtered_data, model_fit) {
               numericInput(
                 ns("strata_rows"),
                 "Grid rows (strata)",
-                value = isolate(if (is.null(input$strata_rows)) 0 else input$strata_rows),
+                value = isolate({
+                  val <- if (is.null(input$strata_rows)) 1 else input$strata_rows
+                  ifelse(is.na(val) || val <= 0, 1, val)
+                }),
                 min = 0,
                 step = 1
               )
@@ -113,7 +206,10 @@ visualize_server <- function(id, filtered_data, model_fit) {
               numericInput(
                 ns("strata_cols"),
                 "Grid columns (strata)",
-                value = isolate(if (is.null(input$strata_cols)) 0 else input$strata_cols),
+                value = isolate({
+                  val <- if (is.null(input$strata_cols)) 1 else input$strata_cols
+                  ifelse(is.na(val) || val <= 0, 1, val)
+                }),
                 min = 0,
                 step = 1
               )
@@ -133,7 +229,10 @@ visualize_server <- function(id, filtered_data, model_fit) {
               numericInput(
                 ns("resp_rows"),
                 "Grid rows (responses)",
-                value = isolate(if (is.null(input$resp_rows)) 0 else input$resp_rows),
+                value = isolate({
+                  val <- if (is.null(input$resp_rows)) 1 else input$resp_rows
+                  ifelse(is.na(val) || val <= 0, 1, val)
+                }),
                 min = 0,
                 step = 1
               )
@@ -143,7 +242,10 @@ visualize_server <- function(id, filtered_data, model_fit) {
               numericInput(
                 ns("resp_cols"),
                 "Grid columns (responses)",
-                value = isolate(if (is.null(input$resp_cols)) 0 else input$resp_cols),
+                value = isolate({
+                  val <- if (is.null(input$resp_cols)) 1 else input$resp_cols
+                  ifelse(is.na(val) || val <= 0, 1, val)
+                }),
                 min = 0,
                 step = 1
               )
@@ -287,7 +389,11 @@ visualize_server <- function(id, filtered_data, model_fit) {
             build_plot(stratum_plots[[stratum_name]], stratum_name, y_limits)
           })
           
-          layout <- compute_layout(length(strata_plot_list), input$strata_rows, input$strata_cols)
+          layout <- compute_layout(
+            length(strata_plot_list),
+            effective_input("strata_rows"),
+            effective_input("strata_cols")
+          )
           
           max_strata_rows <- max(max_strata_rows, layout$nrow)
           max_strata_cols <- max(max_strata_cols, layout$ncol)
@@ -334,7 +440,11 @@ visualize_server <- function(id, filtered_data, model_fit) {
         return(NULL)
       }
 
-      resp_layout <- compute_layout(length(response_plots), input$resp_rows, input$resp_cols)
+      resp_layout <- compute_layout(
+        length(response_plots),
+        effective_input("resp_rows"),
+        effective_input("resp_cols")
+      )
 
       final_plot <- if (length(response_plots) == 1) {
         response_plots[[1]]
@@ -357,6 +467,35 @@ visualize_server <- function(id, filtered_data, model_fit) {
         has_strata = has_strata,
         n_responses = length(response_plots)
       )
+    })
+
+    observeEvent(plot_obj_info(), {
+      info <- plot_obj_info()
+      if (is.null(info)) {
+        return()
+      }
+
+      sync_input <- function(id, value, manual_key) {
+        val <- ifelse(is.null(value) || value <= 0, 1, value)
+        if (!isTRUE(layout_manual[[manual_key]])) {
+          suppress_updates[[id]] <- TRUE
+          updateNumericInput(session, id, value = val)
+        }
+      }
+
+      if (isTRUE(info$has_strata)) {
+        sync_input("strata_rows", info$layout$strata$rows, "strata_rows")
+        sync_input("strata_cols", info$layout$strata$cols, "strata_cols")
+      } else {
+        sync_input("strata_rows", 1, "strata_rows")
+        sync_input("strata_cols", 1, "strata_cols")
+      }
+
+      resp_rows_val <- if (info$n_responses <= 1) 1 else info$layout$responses$nrow
+      resp_cols_val <- if (info$n_responses <= 1) 1 else info$layout$responses$ncol
+
+      sync_input("resp_rows", resp_rows_val, "resp_rows")
+      sync_input("resp_cols", resp_cols_val, "resp_cols")
     })
 
     plot_obj <- reactive({
