@@ -1,8 +1,6 @@
 # ===============================================================
 # 🧪 Animal Trial Analyzer — Analysis Coordinator
 # ===============================================================
-library(shiny)
-
 source("R/animal_trial_analyzer/module_analysis_one-way_anova.R")
 source("R/animal_trial_analyzer/module_analysis_two-way_anova.R")
 source("R/animal_trial_analyzer/module_analysis_utils.R")

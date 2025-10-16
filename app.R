@@ -5,6 +5,12 @@ library(DT)
 library(tools)
 library(broom)
 library(janitor)
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(officer)
+library(flextable)
 
 options(shiny.autoreload = TRUE)
 

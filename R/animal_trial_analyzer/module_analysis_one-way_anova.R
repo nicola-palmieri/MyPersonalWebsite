@@ -1,12 +1,6 @@
 # ===============================================================
 # 🧪 Animal Trial Analyzer — One-way ANOVA
 # ===============================================================
-library(shiny)
-library(DT)
-library(broom)
-library(officer)
-library(flextable)
-
 one_way_anova_ui <- function(id) {
   ns <- NS(id)
   list(

@@ -1,13 +1,6 @@
 # ===============================================================
 # 🧪 Animal Trial Analyzer — Two-way ANOVA Module
 # ===============================================================
-
-library(shiny)
-library(DT)
-library(broom)
-library(officer)
-library(flextable)
-
 two_way_anova_ui <- function(id) {
   ns <- NS(id)
   list(
