@@ -105,8 +105,8 @@ one_way_anova_server <- function(id, filtered_data) {
 
         res <- tryCatch({
           emm <- emmeans::emmeans(model_obj, specs = factor_nm)
-          pairs <- emmeans::pairs(emm, adjust = "tukey")
-          as.data.frame(summary(pairs))
+          contrasts <- emmeans::contrast(emm, method = "pairwise", adjust = "tukey")
+          as.data.frame(summary(contrasts))
         }, error = function(e) {
           list(error = e$message)
         })
