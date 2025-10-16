@@ -28,7 +28,128 @@ two_way_anova_server <- function(id, filtered_data) {
       req(filtered_data())
       filtered_data()
     })
-    
+
+    format_p_value <- function(p_values) {
+      vapply(
+        p_values,
+        function(p) {
+          if (is.na(p)) {
+            return(NA_character_)
+          }
+          if (p < 0.001) {
+            "<0.001"
+          } else {
+            sprintf("%.2f", round(p, 2))
+          }
+        },
+        character(1)
+      )
+    }
+
+    add_significance_marker <- function(formatted_p, raw_p) {
+      mapply(
+        function(fp, rp) {
+          if (is.na(rp)) {
+            return(fp)
+          }
+          if (rp < 0.05) {
+            paste0(fp, "*")
+          } else {
+            fp
+          }
+        },
+        formatted_p,
+        raw_p,
+        USE.NAMES = FALSE
+      )
+    }
+
+    prepare_anova_outputs <- function(model_obj, factor_names) {
+      old_contrasts <- options("contrasts")
+      on.exit(options(old_contrasts), add = TRUE)
+      options(contrasts = c("contr.sum", "contr.poly"))
+
+      anova_obj <- car::Anova(model_obj, type = 3)
+      anova_df <- as.data.frame(anova_obj)
+      anova_df$Effect <- rownames(anova_df)
+      rownames(anova_df) <- NULL
+      anova_df <- anova_df[, c("Effect", setdiff(names(anova_df), "Effect"))]
+
+      p_col <- grep("^Pr", names(anova_df), value = TRUE)
+      p_col <- if (length(p_col) > 0) p_col[1] else NULL
+      raw_p <- if (!is.null(p_col)) anova_df[[p_col]] else rep(NA_real_, nrow(anova_df))
+
+      for (col in names(anova_df)) {
+        if (is.numeric(anova_df[[col]])) {
+          anova_df[[col]] <- round(anova_df[[col]], 2)
+        }
+      }
+
+      anova_significant <- !is.na(raw_p) & raw_p < 0.05
+      if (!is.null(p_col)) {
+        formatted_p <- format_p_value(raw_p)
+        anova_df[[p_col]] <- add_significance_marker(formatted_p, raw_p)
+        names(anova_df)[names(anova_df) == p_col] <- "p.value"
+      } else {
+        anova_df$p.value <- NA_character_
+      }
+
+      factor_names <- unique(factor_names[!is.na(factor_names) & nzchar(factor_names)])
+      posthoc_details <- list()
+      posthoc_combined <- NULL
+      posthoc_significant <- numeric(0)
+
+      for (factor_nm in factor_names) {
+        if (!factor_nm %in% names(model_obj$model)) {
+          next
+        }
+
+        res <- tryCatch({
+          emm <- emmeans::emmeans(model_obj, specs = factor_nm)
+          contrasts <- emmeans::contrast(emm, method = "pairwise", adjust = "tukey")
+          as.data.frame(summary(contrasts))
+        }, error = function(e) {
+          list(error = e$message)
+        })
+
+        if (is.data.frame(res)) {
+          res$Factor <- factor_nm
+          posthoc_details[[factor_nm]] <- list(table = res, error = NULL)
+          posthoc_combined <- rbind(posthoc_combined, res)
+        } else {
+          posthoc_details[[factor_nm]] <- list(table = NULL, error = res$error)
+        }
+      }
+
+      if (!is.null(posthoc_combined)) {
+        posthoc_combined <- posthoc_combined[, c("Factor", setdiff(names(posthoc_combined), "Factor"))]
+        numeric_cols <- names(posthoc_combined)[sapply(posthoc_combined, is.numeric)]
+        if (length(numeric_cols) > 0) {
+          for (col in numeric_cols) {
+            posthoc_combined[[col]] <- round(posthoc_combined[[col]], 2)
+          }
+        }
+
+        if ("p.value" %in% names(posthoc_combined)) {
+          raw_posthoc_p <- posthoc_combined$p.value
+          posthoc_significant <- !is.na(raw_posthoc_p) & raw_posthoc_p < 0.05
+          formatted_posthoc_p <- format_p_value(raw_posthoc_p)
+          posthoc_combined$p.value <- add_significance_marker(formatted_posthoc_p, raw_posthoc_p)
+        } else {
+          posthoc_significant <- rep(FALSE, nrow(posthoc_combined))
+        }
+      }
+
+      list(
+        anova_object = anova_obj,
+        anova_table = anova_df,
+        anova_significant = anova_significant,
+        posthoc_details = posthoc_details,
+        posthoc_table = posthoc_combined,
+        posthoc_significant = posthoc_significant
+      )
+    }
+
     # ----------------------------------------------
     # Dynamic input selectors for response and factors
     # ----------------------------------------------
@@ -283,8 +404,35 @@ two_way_anova_server <- function(id, filtered_data) {
             numeric_cols <- vapply(tidy_df, is.numeric, logical(1))
             tidy_df[numeric_cols] <- lapply(tidy_df[numeric_cols], function(x) round(x, 4))
 
+            factor_names <- unlist(model_info$factors, use.names = FALSE)
+
             output[[paste0("summary_", idx)]] <- renderPrint({
-              summary(model_obj)
+              results <- prepare_anova_outputs(model_obj, factor_names)
+              print(results$anova_object)
+
+              if (length(results$posthoc_details) == 0) {
+                cat("\nNo post-hoc Tukey comparisons were generated.\n")
+              } else {
+                for (factor_nm in names(results$posthoc_details)) {
+                  details <- results$posthoc_details[[factor_nm]]
+                  if (!is.null(details$error)) {
+                    cat(
+                      "\nPost-hoc Tukey comparisons for",
+                      factor_nm,
+                      "could not be computed:",
+                      details$error,
+                      "\n"
+                    )
+                  } else if (!is.null(details$table)) {
+                    cat("\nPost-hoc Tukey comparisons for", factor_nm, ":\n")
+                    tbl <- details$table
+                    if ("Factor" %in% names(tbl)) {
+                      tbl$Factor <- NULL
+                    }
+                    print(tbl)
+                  }
+                }
+              }
             })
 
             output[[paste0("fixed_effects_", idx)]] <- renderDT({
@@ -306,22 +454,34 @@ two_way_anova_server <- function(id, filtered_data) {
                 paste0("anova_results_", safe_resp, "_", Sys.Date(), ".docx")
               },
               content = function(file) {
-                tidy_export <- broom::tidy(model_obj)
-                numeric_cols_export <- vapply(tidy_export, is.numeric, logical(1))
-                tidy_export[numeric_cols_export] <- lapply(tidy_export[numeric_cols_export], function(x) round(x, 4))
+                results <- prepare_anova_outputs(model_obj, factor_names)
 
                 doc <- officer::read_docx()
                 doc <- officer::body_add_par(doc, paste("ANOVA results for:", response_name), style = "heading 1")
                 doc <- officer::body_add_par(doc, paste("Model formula:", format(formula(model_obj))), style = "heading 2")
-                doc <- officer::body_add_par(doc, "R Output", style = "heading 2")
-                summary_lines <- capture.output(summary(model_obj))
-                for (line in summary_lines) {
-                  doc <- officer::body_add_par(doc, line, style = "Normal")
+                doc <- officer::body_add_par(doc, "Type III ANOVA results", style = "heading 2")
+
+                ft_anova <- flextable::flextable(results$anova_table)
+                if (nrow(results$anova_table) > 0) {
+                  ft_anova <- flextable::bold(ft_anova, i = which(results$anova_significant), j = "p.value", bold = TRUE)
                 }
-                doc <- officer::body_add_par(doc, "Coefficient Table", style = "heading 2")
-                ft <- flextable::flextable(tidy_export)
-                ft <- flextable::autofit(ft)
-                doc <- flextable::body_add_flextable(doc, ft)
+                ft_anova <- flextable::autofit(ft_anova)
+                doc <- flextable::body_add_flextable(doc, ft_anova)
+
+                doc <- officer::body_add_par(doc, "Post-hoc Tukey comparisons", style = "heading 2")
+
+                if (is.null(results$posthoc_table) || nrow(results$posthoc_table) == 0) {
+                  doc <- officer::body_add_par(doc, "No post-hoc Tukey comparisons were generated.", style = "Normal")
+                } else {
+                  ft_posthoc <- flextable::flextable(results$posthoc_table)
+                  if (length(results$posthoc_significant) > 0) {
+                    ft_posthoc <- flextable::bold(ft_posthoc, i = which(results$posthoc_significant), j = "p.value", bold = TRUE)
+                  }
+                  ft_posthoc <- flextable::autofit(ft_posthoc)
+                  doc <- flextable::body_add_flextable(doc, ft_posthoc)
+                }
+
+                doc <- officer::body_add_par(doc, "Significant differences are indicated by p < 0.05.", style = "Normal")
 
                 print(doc, target = file)
               }
@@ -347,8 +507,35 @@ two_way_anova_server <- function(id, filtered_data) {
             numeric_cols <- vapply(tidy_df, is.numeric, logical(1))
             tidy_df[numeric_cols] <- lapply(tidy_df[numeric_cols], function(x) round(x, 4))
 
+            factor_names <- unlist(model_info$factors, use.names = FALSE)
+
             output[[paste0("summary_", idx, "_", stratum_idx)]] <- renderPrint({
-              summary(model_obj)
+              results <- prepare_anova_outputs(model_obj, factor_names)
+              print(results$anova_object)
+
+              if (length(results$posthoc_details) == 0) {
+                cat("\nNo post-hoc Tukey comparisons were generated.\n")
+              } else {
+                for (factor_nm in names(results$posthoc_details)) {
+                  details <- results$posthoc_details[[factor_nm]]
+                  if (!is.null(details$error)) {
+                    cat(
+                      "\nPost-hoc Tukey comparisons for",
+                      factor_nm,
+                      "could not be computed:",
+                      details$error,
+                      "\n"
+                    )
+                  } else if (!is.null(details$table)) {
+                    cat("\nPost-hoc Tukey comparisons for", factor_nm, ":\n")
+                    tbl <- details$table
+                    if ("Factor" %in% names(tbl)) {
+                      tbl$Factor <- NULL
+                    }
+                    print(tbl)
+                  }
+                }
+              }
             })
 
             output[[paste0("fixed_effects_", idx, "_", stratum_idx)]] <- renderDT({
@@ -386,23 +573,35 @@ two_way_anova_server <- function(id, filtered_data) {
                 )
               },
               content = function(file) {
-                tidy_export <- broom::tidy(model_obj)
-                numeric_cols_export <- vapply(tidy_export, is.numeric, logical(1))
-                tidy_export[numeric_cols_export] <- lapply(tidy_export[numeric_cols_export], function(x) round(x, 4))
+                results <- prepare_anova_outputs(model_obj, factor_names)
 
                 doc <- officer::read_docx()
                 doc <- officer::body_add_par(doc, paste("ANOVA results for:", response_name), style = "heading 1")
                 doc <- officer::body_add_par(doc, paste("Stratum:", stratum_label), style = "heading 2")
                 doc <- officer::body_add_par(doc, paste("Model formula:", format(formula(model_obj))), style = "heading 2")
-                doc <- officer::body_add_par(doc, "R Output", style = "heading 2")
-                summary_lines <- capture.output(summary(model_obj))
-                for (line in summary_lines) {
-                  doc <- officer::body_add_par(doc, line, style = "Normal")
+                doc <- officer::body_add_par(doc, "Type III ANOVA results", style = "heading 2")
+
+                ft_anova <- flextable::flextable(results$anova_table)
+                if (nrow(results$anova_table) > 0) {
+                  ft_anova <- flextable::bold(ft_anova, i = which(results$anova_significant), j = "p.value", bold = TRUE)
                 }
-                doc <- officer::body_add_par(doc, "Coefficient Table", style = "heading 2")
-                ft <- flextable::flextable(tidy_export)
-                ft <- flextable::autofit(ft)
-                doc <- flextable::body_add_flextable(doc, ft)
+                ft_anova <- flextable::autofit(ft_anova)
+                doc <- flextable::body_add_flextable(doc, ft_anova)
+
+                doc <- officer::body_add_par(doc, "Post-hoc Tukey comparisons", style = "heading 2")
+
+                if (is.null(results$posthoc_table) || nrow(results$posthoc_table) == 0) {
+                  doc <- officer::body_add_par(doc, "No post-hoc Tukey comparisons were generated.", style = "Normal")
+                } else {
+                  ft_posthoc <- flextable::flextable(results$posthoc_table)
+                  if (length(results$posthoc_significant) > 0) {
+                    ft_posthoc <- flextable::bold(ft_posthoc, i = which(results$posthoc_significant), j = "p.value", bold = TRUE)
+                  }
+                  ft_posthoc <- flextable::autofit(ft_posthoc)
+                  doc <- flextable::body_add_flextable(doc, ft_posthoc)
+                }
+
+                doc <- officer::body_add_par(doc, "Significant differences are indicated by p < 0.05.", style = "Normal")
 
                 print(doc, target = file)
               }
