@@ -6,6 +6,7 @@ visualize_ui <- function(id) {
   tagList(
     h4("4. Visualization"),
     uiOutput(ns("layout_controls")),
+    uiOutput(ns("advanced_options")),
     fluidRow(
       column(
         width = 6,
@@ -263,14 +264,117 @@ visualize_server <- function(id, filtered_data, model_fit) {
       )
     })
 
-    plot_obj_info <- reactive({
+    factor1_levels <- reactive({
       info <- model_info()
-      if (is.null(info) || is.null(info$models) || length(info$models) == 0) {
+      data <- df()
+
+      if (is.null(info) || is.null(info$factors) || is.null(info$factors$factor1)) {
+        return(character(0))
+      }
+
+      factor1 <- info$factors$factor1
+      values <- data[[factor1]]
+
+      if (is.null(values)) {
+        return(character(0))
+      }
+
+      if (!is.null(info$orders$order1)) {
+        levels <- info$orders$order1
+      } else if (is.factor(values)) {
+        levels <- levels(values)
+      } else {
+        values <- stats::na.omit(values)
+        levels <- unique(as.character(values))
+      }
+
+      levels <- levels[!is.na(levels) & nzchar(levels)]
+      levels
+    })
+
+    output$advanced_options <- renderUI({
+      levels <- factor1_levels()
+      info <- model_info()
+
+      if (length(levels) == 0 || is.null(info) || is.null(info$factors$factor1)) {
         return(NULL)
       }
 
-      data <- df()
-      req(data)
+      defaults <- scales::hue_pal()(length(levels))
+
+      color_inputs <- lapply(seq_along(levels), function(i) {
+        id <- paste0("color_", i)
+        existing <- isolate(input[[id]])
+        value <- if (is.null(existing) || !nzchar(existing)) defaults[i] else existing
+
+        colourpicker::colourInput(
+          inputId = ns(id),
+          label = levels[i],
+          value = value,
+          showColour = "both"
+        )
+      })
+
+      tags$details(
+        tags$summary(strong("Advanced options")),
+        h5(paste0("Colors for ", info$factors$factor1)),
+        tagList(color_inputs)
+      )
+    })
+
+    color_map <- reactive({
+      levels <- factor1_levels()
+      if (length(levels) == 0) {
+        return(NULL)
+      }
+
+      defaults <- scales::hue_pal()(length(levels))
+      names(defaults) <- levels
+
+      selected <- defaults
+      for (i in seq_along(levels)) {
+        id <- paste0("color_", i)
+        val <- input[[id]]
+        if (!is.null(val) && nzchar(val)) {
+          selected[i] <- val
+        }
+      }
+
+      selected
+    })
+
+    placeholder_result <- function(message = "No plot available") {
+      list(
+        plot = ggplot() +
+          theme_void() +
+          annotate(
+            "text",
+            x = 0.5,
+            y = 0.5,
+            label = message,
+            size = 5,
+            hjust = 0.5,
+            vjust = 0.5
+          ),
+        layout = list(
+          strata = list(rows = 1, cols = 1),
+          responses = list(nrow = 1, ncol = 1)
+        ),
+        has_strata = FALSE,
+        n_responses = 0
+      )
+    }
+
+    plot_obj_info <- reactive({
+      info <- model_info()
+      if (is.null(info) || is.null(info$models) || length(info$models) == 0) {
+        return(placeholder_result())
+      }
+
+      data <- tryCatch(df(), error = function(e) NULL)
+      if (is.null(data) || nrow(data) == 0) {
+        return(placeholder_result())
+      }
 
       factor1 <- info$factors$factor1
       factor2 <- info$factors$factor2
@@ -285,6 +389,9 @@ visualize_server <- function(id, filtered_data, model_fit) {
       }
 
       responses <- info$responses
+      if (is.null(responses) || length(responses) == 0) {
+        return(placeholder_result())
+      }
       has_strata <- !is.null(info$strata) && !is.null(info$strata$var)
       strat_var <- if (has_strata) info$strata$var else NULL
       strata_levels <- if (has_strata) info$strata$levels else character(0)
@@ -301,7 +408,11 @@ visualize_server <- function(id, filtered_data, model_fit) {
       }
 
       compute_stats <- function(df_subset, resp_name) {
-        if (is.null(factor2)) {
+        if (is.null(factor1) || !factor1 %in% names(df_subset)) {
+          return(tibble::tibble())
+        }
+
+        if (is.null(factor2) || !factor2 %in% names(df_subset)) {
           df_subset |>
             group_by(.data[[factor1]]) |>
             summarise(
@@ -321,39 +432,51 @@ visualize_server <- function(id, filtered_data, model_fit) {
       }
 
       build_plot <- function(stats_df, title_text, y_limits) {
-        if (is.null(factor2)) {
-          p <- ggplot(stats_df, aes_string(x = factor1, y = "mean")) +
-            geom_line(aes(group = 1), color = "steelblue", linewidth = 1) +
-            geom_point(size = 3, color = "steelblue") +
-            geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
-                          width = 0.15, color = "gray40") +
-            theme_minimal(base_size = 14) +
-            labs(x = factor1, y = "Mean ± SE") +
-            theme(
-              panel.grid.minor = element_blank(),
-              panel.grid.major.x = element_blank()
-            )
+        colors <- color_map()
+
+        if (!is.null(factor1) && factor1 %in% names(stats_df)) {
+          stats_df[[factor1]] <- factor(stats_df[[factor1]])
+        }
+        if (!is.null(factor2) && factor2 %in% names(stats_df)) {
+          stats_df[[factor2]] <- factor(stats_df[[factor2]])
+        }
+
+        color_var <- NULL
+        if (!is.null(factor1) && factor1 %in% names(stats_df)) {
+          color_var <- factor1
+        } else if (!is.null(factor2) && factor2 %in% names(stats_df)) {
+          color_var <- factor2
+        }
+
+        base_mapping <- if (is.null(factor2) || !factor2 %in% names(stats_df)) {
+          aes(x = .data[[factor1]], y = mean, group = 1)
         } else {
-          p <- ggplot(stats_df, aes_string(
+          aes(x = .data[[factor1]], y = mean, group = .data[[factor2]])
+        }
+
+        p <- ggplot(stats_df, base_mapping)
+        if (!is.null(color_var)) {
+          p <- p + aes(color = .data[[color_var]])
+        }
+
+        p <- p +
+          geom_line(linewidth = 1) +
+          geom_point(size = 3) +
+          geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                        width = 0.15) +
+          theme_minimal(base_size = 14) +
+          labs(
             x = factor1,
-            y = "mean",
-            color = factor2,
-            group = factor2
-          )) +
-            geom_line(linewidth = 1) +
-            geom_point(size = 3) +
-            geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
-                          width = 0.15) +
-            theme_minimal(base_size = 14) +
-            labs(
-              x = factor1,
-              y = "Mean ± SE",
-              color = factor2
-            ) +
-            theme(
-              panel.grid.minor = element_blank(),
-              panel.grid.major.x = element_blank()
-            )
+            y = "Mean ± SE",
+            color = if (!is.null(color_var)) color_var else NULL
+          ) +
+          theme(
+            panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank()
+          )
+
+        if (!is.null(colors) && length(colors) > 0 && identical(color_var, factor1)) {
+          p <- p + scale_color_manual(values = colors, drop = FALSE)
         }
 
         if (!is.null(y_limits) && all(is.finite(y_limits))) {
@@ -437,7 +560,7 @@ visualize_server <- function(id, filtered_data, model_fit) {
       }
 
       if (length(response_plots) == 0) {
-        return(NULL)
+        return(placeholder_result())
       }
 
       resp_layout <- compute_layout(
@@ -501,7 +624,7 @@ visualize_server <- function(id, filtered_data, model_fit) {
     plot_obj <- reactive({
       info <- plot_obj_info()
       if (is.null(info)) {
-        return(NULL)
+        return(placeholder_result()$plot)
       }
       info$plot
     })
