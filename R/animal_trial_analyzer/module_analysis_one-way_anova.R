@@ -219,9 +219,9 @@ one_way_anova_server <- function(id, filtered_data) {
               doc <- officer::body_add_par(doc, "Coefficient Table", style = "heading 2")
               ft <- flextable::flextable(tidy_export)
               ft <- flextable::autofit(ft)
-              doc <- officer::body_add_flextable(doc, ft)
+              doc <- flextable::body_add_flextable(doc, ft)
 
-              officer::print(doc, target = file)
+              print(doc, target = file)
             }
           )
         })

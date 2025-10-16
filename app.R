@@ -8,7 +8,6 @@ library(janitor)
 
 options(shiny.autoreload = TRUE)
 
-
 source("sankey_module.R")
 source("animal_trial_analyzer_module.R")
 
