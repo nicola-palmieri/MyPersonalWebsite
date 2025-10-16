@@ -182,7 +182,7 @@ one_way_anova_server <- function(id, filtered_data) {
         tags$summary(strong("Advanced options")),
         selectInput(
           ns("stratify_var"),
-          "Stratify analysis by (optional):",
+          "Stratify analysis by:",
           choices = choices,
           selected = "None"
         ),

@@ -192,7 +192,7 @@ visualize_server <- function(id, filtered_data, model_fit) {
               width = 6,
               numericInput(
                 ns("strata_rows"),
-                "Grid rows (strata)",
+                "Grid rows",
                 value = isolate({
                   val <- if (is.null(input$strata_rows)) 1 else input$strata_rows
                   ifelse(is.na(val) || val <= 0, 1, val)
@@ -205,7 +205,7 @@ visualize_server <- function(id, filtered_data, model_fit) {
               width = 6,
               numericInput(
                 ns("strata_cols"),
-                "Grid columns (strata)",
+                "Grid columns",
                 value = isolate({
                   val <- if (is.null(input$strata_cols)) 1 else input$strata_cols
                   ifelse(is.na(val) || val <= 0, 1, val)
@@ -222,13 +222,13 @@ visualize_server <- function(id, filtered_data, model_fit) {
 
       response_inputs <- if (!is.null(n_responses) && n_responses > 1) {
         tagList(
-          h5("Across responses (if multiple):"),
+          h5("Across responses:"),
           fluidRow(
             column(
               width = 6,
               numericInput(
                 ns("resp_rows"),
-                "Grid rows (responses)",
+                "Grid rows",
                 value = isolate({
                   val <- if (is.null(input$resp_rows)) 1 else input$resp_rows
                   ifelse(is.na(val) || val <= 0, 1, val)
@@ -241,7 +241,7 @@ visualize_server <- function(id, filtered_data, model_fit) {
               width = 6,
               numericInput(
                 ns("resp_cols"),
-                "Grid columns (responses)",
+                "Grid columns",
                 value = isolate({
                   val <- if (is.null(input$resp_cols)) 1 else input$resp_cols
                   ifelse(is.na(val) || val <= 0, 1, val)
