@@ -1,11 +1,6 @@
 # ===============================================================
 # 🧪 Animal Trial Analyzer — Visualization Module (Simplified adaptive sizing)
 # ===============================================================
-library(shiny)
-library(ggplot2)
-library(dplyr)
-library(patchwork)
-
 visualize_ui <- function(id) {
   ns <- NS(id)
   tagList(

@@ -1,9 +1,6 @@
 # ===============================================================
 # 🧪 Animal Trial Analyzer — Filter Module
 # ===============================================================
-library(shiny)
-library(DT)
-
 filter_ui <- function(id) {
   ns <- NS(id)
   tagList(
