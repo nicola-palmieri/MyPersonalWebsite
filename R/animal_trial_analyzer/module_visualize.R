@@ -5,26 +5,7 @@ visualize_ui <- function(id) {
   ns <- NS(id)
   tagList(
     h4("4. Visualization"),
-    fluidRow(
-      column(
-        width = 6,
-        numericInput(
-          ns("grid_rows"),
-          label = "Grid rows (optional)",
-          value = 0,        # 0 means auto
-          min = 0, step = 1
-        )
-      ),
-      column(
-        width = 6,
-        numericInput(
-          ns("grid_cols"),
-          label = "Grid columns (optional)",
-          value = 0,        # 0 means auto
-          min = 0, step = 1
-        )
-      )
-    ),
+    uiOutput(ns("layout_controls")),
     fluidRow(
       column(
         width = 6,
@@ -64,45 +45,174 @@ visualize_server <- function(id, filtered_data, model_fit) {
     })
     
     model_info <- reactive({
-      req(model_fit())
       model_fit()
     })
     
-    plot_list <- reactive({
+    compute_layout <- function(n_items, rows_input, cols_input, default_rows = NULL) {
+      if (is.null(n_items) || n_items <= 0) {
+        return(list(nrow = 1, ncol = 1))
+      }
+
+      n_row_input <- suppressWarnings(as.numeric(rows_input))
+      n_col_input <- suppressWarnings(as.numeric(cols_input))
+
+      if (!is.na(n_row_input) && n_row_input > 0) {
+        n_row_final <- n_row_input
+        if (!is.na(n_col_input) && n_col_input > 0) {
+          n_col_final <- max(n_col_input, ceiling(n_items / max(1, n_row_final)))
+        } else {
+          n_col_final <- ceiling(n_items / max(1, n_row_final))
+        }
+      } else if (!is.na(n_col_input) && n_col_input > 0) {
+        n_col_final <- n_col_input
+        n_row_final <- ceiling(n_items / max(1, n_col_final))
+      } else {
+        if (is.null(default_rows)) {
+          n_row_final <- ceiling(sqrt(n_items))
+        } else {
+          n_row_final <- default_rows(n_items)
+        }
+        n_col_final <- ceiling(n_items / max(1, n_row_final))
+      }
+
+      n_row_final <- max(1, as.integer(n_row_final))
+      n_col_final <- max(1, as.integer(n_col_final))
+
+      list(nrow = n_row_final, ncol = n_col_final)
+    }
+
+    output$layout_controls <- renderUI({
+      info <- model_info()
+      has_strata <- !is.null(info) && !is.null(info$strata) && !is.null(info$strata$var)
+      n_responses <- if (!is.null(info) && !is.null(info$responses)) length(info$responses) else 0
+
+      strata_inputs <- if (has_strata) {
+        tagList(
+          h5("Within each response (across strata):"),
+          fluidRow(
+            column(
+              width = 6,
+              numericInput(
+                ns("strata_rows"),
+                "Grid rows (strata)",
+                value = isolate(if (is.null(input$strata_rows)) 0 else input$strata_rows),
+                min = 0,
+                step = 1
+              )
+            ),
+            column(
+              width = 6,
+              numericInput(
+                ns("strata_cols"),
+                "Grid columns (strata)",
+                value = isolate(if (is.null(input$strata_cols)) 0 else input$strata_cols),
+                min = 0,
+                step = 1
+              )
+            )
+          )
+        )
+      } else {
+        NULL
+      }
+
+      response_inputs <- if (!is.null(n_responses) && n_responses > 1) {
+        tagList(
+          h5("Across responses (if multiple):"),
+          fluidRow(
+            column(
+              width = 6,
+              numericInput(
+                ns("resp_rows"),
+                "Grid rows (responses)",
+                value = isolate(if (is.null(input$resp_rows)) 0 else input$resp_rows),
+                min = 0,
+                step = 1
+              )
+            ),
+            column(
+              width = 6,
+              numericInput(
+                ns("resp_cols"),
+                "Grid columns (responses)",
+                value = isolate(if (is.null(input$resp_cols)) 0 else input$resp_cols),
+                min = 0,
+                step = 1
+              )
+            )
+          )
+        )
+      } else {
+        NULL
+      }
+
+      tagList(
+        h4("Layout Controls"),
+        strata_inputs,
+        response_inputs
+      )
+    })
+
+    plot_obj_info <- reactive({
       info <- model_info()
       if (is.null(info) || is.null(info$models) || length(info$models) == 0) {
         return(NULL)
       }
-      
+
       data <- df()
       req(data)
-      
+
       factor1 <- info$factors$factor1
       factor2 <- info$factors$factor2
       order1 <- info$orders$order1
       order2 <- info$orders$order2
-      
+
       if (!is.null(factor1) && !is.null(order1)) {
         data[[factor1]] <- factor(data[[factor1]], levels = order1)
       }
       if (!is.null(factor2) && !is.null(order2)) {
         data[[factor2]] <- factor(data[[factor2]], levels = order2)
       }
-      
+
       responses <- info$responses
-      plot_objects <- list()
-      
-      for (resp in responses) {
+      has_strata <- !is.null(info$strata) && !is.null(info$strata$var)
+      strat_var <- if (has_strata) info$strata$var else NULL
+      strata_levels <- if (has_strata) info$strata$levels else character(0)
+      if (has_strata && (is.null(strata_levels) || length(strata_levels) == 0)) {
+        strata_levels <- unique(as.character(stats::na.omit(data[[strat_var]])))
+      }
+
+      response_plots <- list()
+      max_strata_rows <- 1
+      max_strata_cols <- 1
+
+      default_strata_rows <- function(n) {
+        if (n <= 5) 1 else 2
+      }
+
+      compute_stats <- function(df_subset, resp_name) {
         if (is.null(factor2)) {
-          stats <- data |>
+          df_subset |>
             group_by(.data[[factor1]]) |>
             summarise(
-              mean = mean(.data[[resp]], na.rm = TRUE),
-              se = sd(.data[[resp]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp]]))),
+              mean = mean(.data[[resp_name]], na.rm = TRUE),
+              se = sd(.data[[resp_name]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp_name]]))),
               .groups = "drop"
             )
-          
-          p <- ggplot(stats, aes_string(x = factor1, y = "mean")) +
+        } else {
+          df_subset |>
+            group_by(.data[[factor1]], .data[[factor2]]) |>
+            summarise(
+              mean = mean(.data[[resp_name]], na.rm = TRUE),
+              se = sd(.data[[resp_name]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp_name]]))),
+              .groups = "drop"
+            )
+        }
+      }
+
+      build_plot <- function(stats_df, title_text, y_limits) {
+        if (is.null(factor2)) {
+          p <- ggplot(stats_df, aes_string(x = factor1, y = "mean")) +
             geom_line(aes(group = 1), color = "steelblue", linewidth = 1) +
             geom_point(size = 3, color = "steelblue") +
             geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
@@ -112,18 +222,9 @@ visualize_server <- function(id, filtered_data, model_fit) {
             theme(
               panel.grid.minor = element_blank(),
               panel.grid.major.x = element_blank()
-            ) +
-            ggtitle(resp)
-        } else {
-          stats <- data |>
-            group_by(.data[[factor1]], .data[[factor2]]) |>
-            summarise(
-              mean = mean(.data[[resp]], na.rm = TRUE),
-              se = sd(.data[[resp]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp]]))),
-              .groups = "drop"
             )
-          
-          p <- ggplot(stats, aes_string(
+        } else {
+          p <- ggplot(stats_df, aes_string(
             x = factor1,
             y = "mean",
             color = factor2,
@@ -142,50 +243,154 @@ visualize_server <- function(id, filtered_data, model_fit) {
             theme(
               panel.grid.minor = element_blank(),
               panel.grid.major.x = element_blank()
-            ) +
-            ggtitle(resp)
+            )
         }
-        
-        plot_objects[[resp]] <- p
+
+        if (!is.null(y_limits) && all(is.finite(y_limits))) {
+          p <- p + scale_y_continuous(limits = y_limits)
+        }
+
+        p + ggtitle(title_text)
       }
-      
-      plot_objects
-    })
-    
-    # Combine plots and compute grid layout
-    plot_obj <- reactive({
-      plots <- plot_list()
-      if (is.null(plots) || length(plots) == 0) {
+
+      for (resp in responses) {
+        if (has_strata) {
+          stratum_plots <- list()
+          y_values <- c()
+
+          for (stratum in strata_levels) {
+            subset_data <- data[!is.na(data[[strat_var]]) & data[[strat_var]] == stratum, , drop = FALSE]
+            if (nrow(subset_data) == 0) {
+              next
+            }
+
+            stats_df <- compute_stats(subset_data, resp)
+            if (nrow(stats_df) == 0) {
+              next
+            }
+
+            y_values <- c(y_values, stats_df$mean - stats_df$se, stats_df$mean + stats_df$se)
+            stratum_plots[[stratum]] <- stats_df
+          }
+
+          if (length(stratum_plots) == 0) {
+            next
+          }
+
+          y_limits <- range(y_values, na.rm = TRUE)
+          if (!all(is.finite(y_limits))) {
+            y_limits <- NULL
+          }
+
+          strata_plot_list <- lapply(names(stratum_plots), function(stratum_name) {
+            build_plot(stratum_plots[[stratum_name]], stratum_name, y_limits)
+          })
+
+          layout <- compute_layout(
+            length(strata_plot_list),
+            input$strata_rows,
+            input$strata_cols,
+            default_strata_rows
+          )
+
+          max_strata_rows <- max(max_strata_rows, layout$nrow)
+          max_strata_cols <- max(max_strata_cols, layout$ncol)
+
+          combined <- patchwork::wrap_plots(
+            plotlist = strata_plot_list,
+            nrow = layout$nrow,
+            ncol = layout$ncol
+          ) +
+            patchwork::plot_annotation(title = resp)
+
+          response_plots[[resp]] <- combined
+        } else {
+          stats_df <- compute_stats(data, resp)
+          if (nrow(stats_df) == 0) {
+            next
+          }
+
+          y_values <- c(stats_df$mean - stats_df$se, stats_df$mean + stats_df$se)
+          y_limits <- range(y_values, na.rm = TRUE)
+          if (!all(is.finite(y_limits))) {
+            y_limits <- NULL
+          }
+
+          response_plots[[resp]] <- build_plot(stats_df, resp, y_limits)
+          max_strata_rows <- max(max_strata_rows, 1)
+          max_strata_cols <- max(max_strata_cols, 1)
+        }
+      }
+
+      if (length(response_plots) == 0) {
         return(NULL)
       }
-      
-      n <- length(plots)
-      n_row <- suppressWarnings(as.numeric(input$grid_rows))
-      n_col <- suppressWarnings(as.numeric(input$grid_cols))
-      
-      if (is.na(n_row) || n_row < 1) n_row <- ceiling(sqrt(n))
-      if (is.na(n_col) || n_col < 1) n_col <- ceiling(n / n_row)
-      
-      patchwork::wrap_plots(plotlist = plots, nrow = n_row, ncol = n_col)
+
+      resp_layout <- compute_layout(
+        length(response_plots),
+        if (!is.null(input$resp_rows)) input$resp_rows else 0,
+        if (!is.null(input$resp_cols)) input$resp_cols else 0
+      )
+
+      final_plot <- if (length(response_plots) == 1) {
+        response_plots[[1]]
+      } else {
+        patchwork::wrap_plots(
+          plotlist = response_plots,
+          nrow = resp_layout$nrow,
+          ncol = resp_layout$ncol
+        )
+      }
+
+      list(
+        plot = final_plot,
+        layout = list(
+          strata = list(rows = max_strata_rows, cols = max_strata_cols),
+          responses = resp_layout
+        ),
+        has_strata = has_strata,
+        n_responses = length(response_plots)
+      )
+    })
+
+    plot_obj <- reactive({
+      info <- plot_obj_info()
+      if (is.null(info)) {
+        return(NULL)
+      }
+      info$plot
     })
     
     # ---- Dynamic sizing logic (pixels) ----
     plot_size <- reactive({
-      n <- length(plot_list())
+      info <- plot_obj_info()
       w_sub <- input$subplot_width
       h_sub <- input$subplot_height
-      
-      if (is.null(n) || n == 0) return(list(w = w_sub, h = h_sub))
-      if (n == 1) return(list(w = w_sub, h = h_sub))
-      
-      n_row <- suppressWarnings(as.numeric(input$grid_rows))
-      n_col <- suppressWarnings(as.numeric(input$grid_cols))
-      if (is.na(n_row) || n_row < 1) n_row <- ceiling(sqrt(n))
-      if (is.na(n_col) || n_col < 1) n_col <- ceiling(n / n_row)
-      
+
+      if (is.null(w_sub) || is.na(w_sub)) {
+        w_sub <- 300
+      }
+      if (is.null(h_sub) || is.na(h_sub)) {
+        h_sub <- 200
+      }
+
+      if (is.null(info)) {
+        return(list(w = w_sub, h = h_sub))
+      }
+
+      strata_cols <- info$layout$strata$cols
+      strata_rows <- info$layout$strata$rows
+      resp_cols <- info$layout$responses$ncol
+      resp_rows <- info$layout$responses$nrow
+
+      if (is.null(strata_cols) || strata_cols < 1) strata_cols <- 1
+      if (is.null(strata_rows) || strata_rows < 1) strata_rows <- 1
+      if (is.null(resp_cols) || resp_cols < 1) resp_cols <- 1
+      if (is.null(resp_rows) || resp_rows < 1) resp_rows <- 1
+
       list(
-        w = w_sub * n_col,
-        h = h_sub * n_row
+        w = w_sub * strata_cols * resp_cols,
+        h = h_sub * strata_rows * resp_rows
       )
     })
     
