@@ -6,6 +6,7 @@ visualize_ui <- function(id) {
   tagList(
     h4("4. Visualization"),
     uiOutput(ns("layout_controls")),
+    uiOutput(ns("advanced_options")),
     fluidRow(
       column(
         width = 6,
@@ -263,6 +264,85 @@ visualize_server <- function(id, filtered_data, model_fit) {
       )
     })
 
+    factor1_levels <- reactive({
+      info <- model_info()
+      data <- df()
+
+      if (is.null(info) || is.null(info$factors) || is.null(info$factors$factor1)) {
+        return(character(0))
+      }
+
+      factor1 <- info$factors$factor1
+      values <- data[[factor1]]
+
+      if (is.null(values)) {
+        return(character(0))
+      }
+
+      if (!is.null(info$orders$order1)) {
+        levels <- info$orders$order1
+      } else if (is.factor(values)) {
+        levels <- levels(values)
+      } else {
+        values <- stats::na.omit(values)
+        levels <- unique(as.character(values))
+      }
+
+      levels <- levels[!is.na(levels) & nzchar(levels)]
+      levels
+    })
+
+    output$advanced_options <- renderUI({
+      levels <- factor1_levels()
+      info <- model_info()
+
+      if (length(levels) == 0 || is.null(info) || is.null(info$factors$factor1)) {
+        return(NULL)
+      }
+
+      defaults <- scales::hue_pal()(length(levels))
+
+      color_inputs <- lapply(seq_along(levels), function(i) {
+        id <- paste0("color_", i)
+        existing <- isolate(input[[id]])
+        value <- if (is.null(existing) || !nzchar(existing)) defaults[i] else existing
+
+        colourpicker::colourInput(
+          inputId = ns(id),
+          label = levels[i],
+          value = value,
+          showColour = "both"
+        )
+      })
+
+      tags$details(
+        tags$summary(strong("Advanced options")),
+        h5(paste0("Colors for ", info$factors$factor1)),
+        tagList(color_inputs)
+      )
+    })
+
+    color_map <- reactive({
+      levels <- factor1_levels()
+      if (length(levels) == 0) {
+        return(NULL)
+      }
+
+      defaults <- scales::hue_pal()(length(levels))
+      names(defaults) <- levels
+
+      selected <- defaults
+      for (i in seq_along(levels)) {
+        id <- paste0("color_", i)
+        val <- input[[id]]
+        if (!is.null(val) && nzchar(val)) {
+          selected[i] <- val
+        }
+      }
+
+      selected
+    })
+
     plot_obj_info <- reactive({
       info <- model_info()
       if (is.null(info) || is.null(info$models) || length(info$models) == 0) {
@@ -321,12 +401,19 @@ visualize_server <- function(id, filtered_data, model_fit) {
       }
 
       build_plot <- function(stats_df, title_text, y_limits) {
+        colors <- color_map()
+
         if (is.null(factor2)) {
-          p <- ggplot(stats_df, aes_string(x = factor1, y = "mean")) +
-            geom_line(aes(group = 1), color = "steelblue", linewidth = 1) +
-            geom_point(size = 3, color = "steelblue") +
+          p <- ggplot(stats_df, aes_string(
+            x = factor1,
+            y = "mean",
+            color = factor1,
+            group = "1"
+          )) +
+            geom_line(linewidth = 1) +
+            geom_point(size = 3) +
             geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
-                          width = 0.15, color = "gray40") +
+                          width = 0.15) +
             theme_minimal(base_size = 14) +
             labs(x = factor1, y = "Mean ± SE") +
             theme(
@@ -337,7 +424,7 @@ visualize_server <- function(id, filtered_data, model_fit) {
           p <- ggplot(stats_df, aes_string(
             x = factor1,
             y = "mean",
-            color = factor2,
+            color = factor1,
             group = factor2
           )) +
             geom_line(linewidth = 1) +
@@ -348,12 +435,16 @@ visualize_server <- function(id, filtered_data, model_fit) {
             labs(
               x = factor1,
               y = "Mean ± SE",
-              color = factor2
+              color = factor1
             ) +
             theme(
               panel.grid.minor = element_blank(),
               panel.grid.major.x = element_blank()
             )
+        }
+
+        if (!is.null(colors) && length(colors) > 0) {
+          p <- p + scale_color_manual(values = colors, drop = FALSE)
         }
 
         if (!is.null(y_limits) && all(is.finite(y_limits))) {
