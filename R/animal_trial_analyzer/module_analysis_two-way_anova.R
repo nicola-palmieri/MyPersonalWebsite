@@ -197,7 +197,6 @@ two_way_anova_server <- function(id, filtered_data) {
             title = responses[i],
             tags$div(
               tags$details(
-                open = FALSE,
                 tags$summary(strong("R Output")),
                 verbatimTextOutput(ns(paste0("summary_", i)))
               ),

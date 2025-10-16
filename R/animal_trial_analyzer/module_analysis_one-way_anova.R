@@ -9,7 +9,7 @@ one_way_anova_ui <- function(id) {
       uiOutput(ns("level_order")),
       uiOutput(ns("advanced_options")),
       br(),
-      actionButton(ns("run"), "Run ANOVA")
+      actionButton(ns("run"), "Run One-way ANOVA")
     ),
     results = tagList(
       uiOutput(ns("summary_ui")),
@@ -58,7 +58,6 @@ one_way_anova_server <- function(id, filtered_data) {
       choices <- c("None", setdiff(unique(cat_cols), "None"))
 
       tags$details(
-        open = FALSE,
         tags$summary(strong("Advanced options")),
         selectInput(
           ns("stratify_var"),
