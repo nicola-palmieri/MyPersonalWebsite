@@ -64,7 +64,42 @@ one_way_anova_server <- function(id, filtered_data) {
           "Stratify analysis by (optional):",
           choices = choices,
           selected = "None"
-        )
+        ),
+        uiOutput(ns("strata_order_ui"))
+      )
+    })
+
+    output$strata_order_ui <- renderUI({
+      req(df())
+      strat_var <- input$stratify_var
+
+      if (is.null(strat_var) || identical(strat_var, "None")) {
+        return(NULL)
+      }
+
+      data <- df()
+      values <- data[[strat_var]]
+      if (is.null(values)) {
+        return(NULL)
+      }
+
+      if (is.factor(values)) {
+        strata_levels <- levels(values)
+      } else {
+        values <- values[!is.na(values)]
+        strata_levels <- unique(as.character(values))
+      }
+
+      if (length(strata_levels) == 0) {
+        return(NULL)
+      }
+
+      selectInput(
+        ns("strata_order"),
+        paste("Order of levels for", strat_var, "(strata):"),
+        choices = strata_levels,
+        selected = strata_levels,
+        multiple = TRUE
       )
     })
 
@@ -127,6 +162,14 @@ one_way_anova_server <- function(id, filtered_data) {
 
       strat_var <- input$stratify_var
 
+      if (!is.null(strat_var) && !identical(strat_var, "None")) {
+        if (!is.null(input$strata_order) && length(input$strata_order) > 0) {
+          data[[strat_var]] <- factor(data[[strat_var]], levels = input$strata_order)
+        } else {
+          data[[strat_var]] <- factor(data[[strat_var]])
+        }
+      }
+
       if (is.null(strat_var) || identical(strat_var, "None")) {
         model_list <- list()
         for (resp in responses) {
@@ -143,7 +186,8 @@ one_way_anova_server <- function(id, filtered_data) {
         ))
       }
 
-      strata <- unique(as.character(stats::na.omit(data[[strat_var]])))
+      strata_counts <- table(data[[strat_var]])
+      strata <- names(strata_counts)[strata_counts > 0]
       if (length(strata) == 0) {
         validate(need(FALSE, "No valid strata found for the selected variable."))
       }
