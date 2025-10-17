@@ -1,11 +1,11 @@
 # ===============================================================
-# 🧪 Animal Trial Analyzer — Upload Module (long-format only)
+# 🧪 Animal Trial Analyzer — Upload Module (long + flat wide support)
 # ===============================================================
 
 upload_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    h4("1. Upload Data (long format only)"),
+    h4("1. Upload Data (long or flat-wide format)"),
     fileInput(ns("file"), "Upload Excel file (.xlsx / .xls / .xlsm)", accept = c(".xlsx", ".xls", ".xlsm")),
     uiOutput(ns("sheet_selector")),     # <- will always render something
     br(),
@@ -101,9 +101,40 @@ upload_server <- function(id) {
         return()
       }
       
-      # ---- STEP 3: validate long format ----
-      msg <- validate_long_format(tmp)
-      output$validation_msg <- renderText(msg)
+      # ---- STEP 3: validate / convert to long format ----
+      validation_msg <- validate_long_format(tmp)
+
+      if (!identical(validation_msg, "✅ Data appears to be in long format.")) {
+        converted <- tryCatch(convert_flat_wide_to_long(tmp), error = function(e) e)
+
+        if (!inherits(converted, "error")) {
+          converted_validation <- validate_long_format(converted)
+
+          if (identical(converted_validation, "✅ Data appears to be in long format.")) {
+            tmp <- converted
+            validation_msg <- paste(
+              "ℹ️ Detected flat wide layout — converted to long format automatically.",
+              converted_validation,
+              sep = "\n"
+            )
+          } else {
+            validation_msg <- paste(
+              "⚠️ Converted from flat wide layout but data still needs attention:",
+              converted_validation,
+              sep = "\n"
+            )
+            tmp <- converted
+          }
+        } else {
+          validation_msg <- paste(
+            validation_msg,
+            paste("ℹ️ Attempted flat wide conversion but failed:", conditionMessage(converted)),
+            sep = "\n\n"
+          )
+        }
+      }
+
+      output$validation_msg <- renderText(validation_msg)
       df(tmp)
       
       output$preview <- renderDT(
