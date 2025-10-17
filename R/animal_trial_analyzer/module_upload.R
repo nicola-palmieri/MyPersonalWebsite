@@ -166,20 +166,6 @@ upload_server <- function(id) {
 # ------------------------------
 # Validation helper
 # ------------------------------
-validate_long_format <- function(data) {
-  if (!is.data.frame(data))            return("❌ Not a valid table.")
-  if (ncol(data) < 3)                  return("⚠️ Expected ≥3 columns (ID, factor, value).")
-  if (any(names(data) == "" | is.na(names(data))))
-    return("⚠️ Some columns are unnamed — please fix in Excel.")
-  
-  num_cols <- names(data)[sapply(data, is.numeric)]
-  chr_cols <- names(data)[sapply(data, function(x) is.character(x) || is.factor(x))]
-  
-  if (length(num_cols) == 0)           return("⚠️ No numeric columns detected.")
-  if (length(chr_cols) < 1)            return("⚠️ No categorical columns detected.")
-  
-  "✅ Data appears to be in long format."
-}
 
 convert_flat_wide_to_long <- function(data) {
   all_cols <- names(data)
