@@ -22,7 +22,7 @@ filter_ui <- function(id) {
     mainPanel(
       width = 8,
       h4("Filtered Data Preview"),
-      DTOutput(ns("filtered_preview"))
+      DT::DTOutput(ns("filtered_preview"))
     )
   )
 }
@@ -140,9 +140,9 @@ filter_server <- function(id, uploaded_data) {
     
     
     # --- 4. Preview
-    output$filtered_preview <- renderDT({
+    output$filtered_preview <- DT::renderDT({
       req(filtered_df())
-      datatable(filtered_df(),
+      DT::datatable(filtered_df(),
                 options = list(scrollX = TRUE, pageLength = 5))
     })
     

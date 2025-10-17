@@ -320,18 +320,20 @@ visualize_server <- function(id, filtered_data, model_fit) {
       compute_stats <- function(df_subset, resp_name) {
         if (is.null(factor2)) {
           df_subset |>
-            group_by(.data[[factor1]]) |>
-            summarise(
-              mean = mean(.data[[resp_name]], na.rm = TRUE),
-              se = sd(.data[[resp_name]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp_name]]))),
+            dplyr::group_by(rlang::.data[[factor1]]) |>
+            dplyr::summarise(
+              mean = mean(rlang::.data[[resp_name]], na.rm = TRUE),
+              se = stats::sd(rlang::.data[[resp_name]], na.rm = TRUE) /
+                sqrt(sum(!is.na(rlang::.data[[resp_name]]))),
               .groups = "drop"
             )
         } else {
           df_subset |>
-            group_by(.data[[factor1]], .data[[factor2]]) |>
-            summarise(
-              mean = mean(.data[[resp_name]], na.rm = TRUE),
-              se = sd(.data[[resp_name]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp_name]]))),
+            dplyr::group_by(rlang::.data[[factor1]], rlang::.data[[factor2]]) |>
+            dplyr::summarise(
+              mean = mean(rlang::.data[[resp_name]], na.rm = TRUE),
+              se = stats::sd(rlang::.data[[resp_name]], na.rm = TRUE) /
+                sqrt(sum(!is.na(rlang::.data[[resp_name]]))),
               .groups = "drop"
             )
         }
