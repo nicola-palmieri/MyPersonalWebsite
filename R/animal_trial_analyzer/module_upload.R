@@ -36,7 +36,7 @@ upload_ui <- function(id) {
       h4("Data Preview"),
       verbatimTextOutput(ns("validation_msg")),
       hr(),
-      DTOutput(ns("preview"))
+      DT::DTOutput(ns("preview"))
     )
   )
 }
@@ -57,7 +57,7 @@ upload_server <- function(id) {
       
       fname <- input$file$name
       fpath <- input$file$datapath
-      ext   <- tolower(file_ext(fname))
+      ext   <- tolower(tools::file_ext(fname))
       
       # Show immediate debug info
       output$validation_msg <- renderText({
@@ -81,7 +81,7 @@ upload_server <- function(id) {
         return()
       }
       
-      sheets <- tryCatch(excel_sheets(fpath), error = function(e) e)
+      sheets <- tryCatch(readxl::excel_sheets(fpath), error = function(e) e)
       
       if (inherits(sheets, "error")) {
         output$sheet_selector <- renderUI(
@@ -109,7 +109,7 @@ upload_server <- function(id) {
       req(input$file, input$sheet)
       
       tmp <- tryCatch(
-        read_excel(input$file$datapath, sheet = input$sheet),
+        readxl::read_excel(input$file$datapath, sheet = input$sheet),
         error = function(e) e
       )
       if (inherits(tmp, "error")) {
@@ -117,7 +117,7 @@ upload_server <- function(id) {
         output$validation_msg <- renderText(
           paste("❌ Error loading sheet:", conditionMessage(tmp))
         )
-        output$preview <- renderDT(NULL)
+        output$preview <- DT::renderDT(NULL)
         return()
       }
       
@@ -152,7 +152,7 @@ upload_server <- function(id) {
       
       df(tmp)
       
-      output$preview <- renderDT(
+      output$preview <- DT::renderDT(
         tmp,
         options = list(scrollX = TRUE, pageLength = 5)
       )
