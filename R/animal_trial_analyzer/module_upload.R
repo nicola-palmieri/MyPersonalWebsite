@@ -15,7 +15,8 @@ upload_ui <- function(id) {
         label = "Data layout:",
         choices = c(
           "Long format (one row per measurement)" = "long",
-          "Flat Wide (replicates as suffixes)"   = "flat"
+          "Flat Wide (replicates as suffixes)"   = "flat",
+          "GraphPad-Style (two header rows)"     = "graphpad"
         ),
         selected = "long"
       ),
@@ -64,11 +65,17 @@ upload_server <- function(id) {
           "Long format — one row per animal × replicate.",
           "Each replicate is a separate row; responses (FAMACHA, BCS, EPG) each have their own column."
         )
-      } else {
+      } else if (input$layout_type == "flat") {
         toy <- readxl::read_excel(flat_path, n_max = 5)
         caption_txt <- paste(
           "Flat wide format — replicates stored as column suffixes (_1, _2, _3...).",
           "Each animal appears once; replicate values span multiple columns for each response variable."
+        )
+      } else {
+        toy <- readxl::read_excel(file.path("data", "toy_animal_trial_data_graphpad.xlsx"), n_max = 5)
+        caption_txt <- paste(
+          "GraphPad-style format — two header rows.",
+          "First row: response names (one per block). Second row: replicate numbers (1, 2, 3...)."
         )
       }
       
@@ -185,6 +192,30 @@ upload_server <- function(id) {
           tmp <- converted
           output$validation_msg <- renderText("ℹ️ Flat-wide format converted successfully.")
         }
+      } else if (input$layout_type == "graphpad") {
+        # 🧩 GraphPad-style (two header rows with blanks)
+        tmp_path <- input$file$datapath
+        raw_header <- readxl::read_excel(tmp_path, sheet = input$sheet, n_max = 2, col_names = FALSE)
+        
+        # Fill blanks in the first header row (left to right)
+        filled_row1 <- raw_header[1, ]
+        for (j in seq_along(filled_row1)) {
+          if (is.na(filled_row1[[j]]) || filled_row1[[j]] == "") {
+            filled_row1[[j]] <- filled_row1[[j - 1]]
+          }
+        }
+        
+        # Combine the two rows into single column names
+        colnames <- mapply(function(a, b) paste0(a, "_", b),
+                           filled_row1, raw_header[2, ],
+                           SIMPLIFY = TRUE)
+        
+        # Read the rest of the data with the new names
+        tmp <- readxl::read_excel(tmp_path, sheet = input$sheet, skip = 2, col_names = colnames)
+        tmp <- janitor::clean_names(tmp)
+        tmp <- convert_flat_wide_to_long(tmp)
+        
+        output$validation_msg <- renderText("✅ GraphPad-style format recognized and reshaped to long format.")
       } else {
         output$validation_msg <- renderText("✅ Long format loaded successfully.")
       }
