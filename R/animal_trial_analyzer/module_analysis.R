@@ -7,16 +7,32 @@ source("R/animal_trial_analyzer/module_analysis_utils.R")
 
 analysis_ui <- function(id) {
   ns <- NS(id)
-  list(
-    heading = h4("3. Statistical Analysis"),
-    type_selector = selectInput(
-      ns("analysis_type"),
-      "Select analysis type:",
-      choices = c("One-way ANOVA", "Two-way ANOVA"),  # more will be added here later
-      selected = "One-way ANOVA"
+  sidebarLayout(
+    sidebarPanel(
+      width = 4,
+      h4("Step 3 — Analyze Results"),
+      p("Choose the statistical approach that fits your trial design, then inspect the summaries on the right."),
+      hr(),
+      selectInput(
+        ns("analysis_type"),
+        "Select analysis type:",
+        choices = c("One-way ANOVA", "Two-way ANOVA"),
+        selected = "One-way ANOVA"
+      ),
+      hr(),
+      uiOutput(ns("config_panel")),
+      hr(),
+      div(
+        class = "d-flex justify-content-between gap-2",
+        actionButton(ns("back_filter"), "← Back"),
+        actionButton(ns("go_visualize"), "Continue →", class = "btn-primary")
+      )
     ),
-    config_panel = uiOutput(ns("config_panel")),
-    results_panel = uiOutput(ns("results_panel"))
+    mainPanel(
+      width = 8,
+      h4("Analysis Results"),
+      uiOutput(ns("results_panel"))
+    )
   )
 }
 

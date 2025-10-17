@@ -4,13 +4,31 @@
 
 upload_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    h4("1. Upload Data (long or flat-wide format)"),
-    fileInput(ns("file"), "Upload Excel file (.xlsx / .xls / .xlsm)", accept = c(".xlsx", ".xls", ".xlsm")),
-    uiOutput(ns("sheet_selector")),     # <- will always render something
-    br(),
-    verbatimTextOutput(ns("validation_msg")),  # format checks + debug text
-    DTOutput(ns("preview"))
+  sidebarLayout(
+    sidebarPanel(
+      width = 4,
+      h4("Step 1 — Upload Data"),
+      p("Upload your Excel file in long format, choose the worksheet, and follow the guidance before proceeding."),
+      hr(),
+      fileInput(
+        ns("file"),
+        "Upload Excel file (.xlsx / .xls / .xlsm)",
+        accept = c(".xlsx", ".xls", ".xlsm")
+      ),
+      uiOutput(ns("sheet_selector")),
+      hr(),
+      div(
+        class = "d-flex justify-content-end",
+        actionButton(ns("go_filter"), "Continue →", class = "btn-primary")
+      )
+    ),
+    mainPanel(
+      width = 8,
+      h4("Data Preview"),
+      verbatimTextOutput(ns("validation_msg")),
+      hr(),
+      DTOutput(ns("preview"))
+    )
   )
 }
 

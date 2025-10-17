@@ -3,35 +3,52 @@
 # ===============================================================
 visualize_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    h4("4. Visualization"),
-    uiOutput(ns("layout_controls")),
-    fluidRow(
-      column(
-        width = 6,
-        numericInput(
-          ns("subplot_width"),
-          label = "Subplot width (px)",
-          value = 300,
-          min = 200,
-          max = 1200,
-          step = 50
+  sidebarLayout(
+    sidebarPanel(
+      width = 4,
+      h4("Step 4 — Visualize Outcomes"),
+      p("Tweak the layout of the mean ± SE plots, download the figure, and wrap up your workflow."),
+      hr(),
+      uiOutput(ns("layout_controls")),
+      hr(),
+      fluidRow(
+        column(
+          width = 6,
+          numericInput(
+            ns("subplot_width"),
+            label = "Subplot width (px)",
+            value = 300,
+            min = 200,
+            max = 1200,
+            step = 50
+          )
+        ),
+        column(
+          width = 6,
+          numericInput(
+            ns("subplot_height"),
+            label = "Subplot height (px)",
+            value = 200,
+            min = 200,
+            max = 1200,
+            step = 50
+          )
         )
       ),
-      column(
-        width = 6,
-        numericInput(
-          ns("subplot_height"),
-          label = "Subplot height (px)",
-          value = 200,
-          min = 200,
-          max = 1200,
-          step = 50
-        )
+      hr(),
+      downloadButton(ns("download_plot"), "Download PNG (300 dpi)"),
+      hr(),
+      div(
+        class = "d-flex justify-content-between gap-2",
+        actionButton(ns("back_analysis"), "← Back"),
+        actionButton(ns("finish"), "Finish", class = "btn-success")
       )
     ),
-    downloadButton(ns("download_plot"), "Download PNG (300 dpi)"),
-    plotOutput(ns("mean_se_plot"))
+    mainPanel(
+      width = 8,
+      h4("Mean ± SE Plot"),
+      plotOutput(ns("mean_se_plot"))
+    )
   )
 }
 

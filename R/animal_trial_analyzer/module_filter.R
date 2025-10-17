@@ -3,12 +3,27 @@
 # ===============================================================
 filter_ui <- function(id) {
   ns <- NS(id)
-  tagList(
-    h4("2. Filter Data"),
-    uiOutput(ns("column_selector")),
-    uiOutput(ns("filter_widgets")),
-    br(),
-    DTOutput(ns("filtered_preview"))
+  sidebarLayout(
+    sidebarPanel(
+      width = 4,
+      h4("Step 2 — Filter Records"),
+      p("Pick the columns to focus on and adjust the filters to refine the dataset for analysis."),
+      hr(),
+      uiOutput(ns("column_selector")),
+      hr(),
+      uiOutput(ns("filter_widgets")),
+      hr(),
+      div(
+        class = "d-flex justify-content-between gap-2",
+        actionButton(ns("back_upload"), "← Back"),
+        actionButton(ns("go_analysis"), "Continue →", class = "btn-primary")
+      )
+    ),
+    mainPanel(
+      width = 8,
+      h4("Filtered Data Preview"),
+      DTOutput(ns("filtered_preview"))
+    )
   )
 }
 
