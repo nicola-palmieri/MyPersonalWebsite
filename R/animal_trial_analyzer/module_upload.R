@@ -10,6 +10,15 @@ upload_ui <- function(id) {
       h4("Step 1 — Upload Data"),
       p("Upload your Excel file in long format, choose the worksheet, and follow the guidance before proceeding."),
       hr(),
+      radioButtons(
+        ns("layout_type"),
+        label = "Data layout:",
+        choices = c(
+          "Long format (one row per measurement)" = "long",
+          "Flat Wide (replicates as suffixes)"   = "flat"
+        ),
+        selected = "long"
+      ),
       fileInput(
         ns("file"),
         "Upload Excel file (.xlsx / .xls / .xlsm)",
@@ -96,20 +105,13 @@ upload_server <- function(id) {
     }, ignoreInit = TRUE)
     
     # ---- STEP 2: load selected sheet ----
-    observeEvent(list(input$sheet, input$file$datapath), {
+    observeEvent(list(input$sheet, input$file$datapath, input$layout_type), {
       req(input$file, input$sheet)
-
+      
       tmp <- tryCatch(
         read_excel(input$file$datapath, sheet = input$sheet),
         error = function(e) e
       )
-      
-      # Clean column names immediately after successful load
-      if (!inherits(tmp, "error")) {
-        tmp <- janitor::clean_names(tmp)
-      }
-      
-      
       if (inherits(tmp, "error")) {
         df(NULL)
         output$validation_msg <- renderText(
@@ -119,47 +121,43 @@ upload_server <- function(id) {
         return()
       }
       
-      # ---- STEP 3: validate / convert to long format ----
-      validation_msg <- validate_long_format(tmp)
-
-      if (!identical(validation_msg, "✅ Data appears to be in long format.")) {
+      tmp <- janitor::clean_names(tmp)
+      
+      # ---- EXPLICIT CONVERSION ----
+      if (input$layout_type == "flat") {
         converted <- tryCatch(convert_flat_wide_to_long(tmp), error = function(e) e)
-
-        if (!inherits(converted, "error")) {
-          converted_validation <- validate_long_format(converted)
-
-          if (identical(converted_validation, "✅ Data appears to be in long format.")) {
-            tmp <- converted
-            validation_msg <- paste(
-              "ℹ️ Detected flat wide layout — converted to long format automatically.",
-              converted_validation,
-              sep = "\n"
-            )
-          } else {
-            validation_msg <- paste(
-              "⚠️ Converted from flat wide layout but data still needs attention:",
-              converted_validation,
-              sep = "\n"
-            )
-            tmp <- converted
-          }
-        } else {
-          validation_msg <- paste(
-            validation_msg,
-            paste("ℹ️ Attempted flat wide conversion but failed:", conditionMessage(converted)),
-            sep = "\n\n"
+        if (inherits(converted, "error")) {
+          output$validation_msg <- renderText(
+            paste("❌ Flat-wide conversion failed:", conditionMessage(converted))
           )
+          df(NULL)
+          return()
+        } else {
+          tmp <- converted
+          output$validation_msg <- renderText("ℹ️ Flat-wide format converted successfully.")
         }
+      } else {
+        output$validation_msg <- renderText("✅ Long format loaded successfully.")
       }
-
-      output$validation_msg <- renderText(validation_msg)
+      
+      # optional: normalize column names
+      names(tmp) <- tolower(names(tmp))
+      names(tmp) <- dplyr::recode(
+        names(tmp),
+        animal_id = "AnimalID",
+        treatment = "Treatment",
+        farm = "Farm",
+        replicate = "Replicate"
+      )
+      
       df(tmp)
       
       output$preview <- renderDT(
         tmp,
         options = list(scrollX = TRUE, pageLength = 5)
       )
-    }, ignoreInit = TRUE, ignoreNULL = TRUE)
+    })
+    
     
     return(df)
   })
