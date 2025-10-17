@@ -318,23 +318,32 @@ visualize_server <- function(id, filtered_data, model_fit) {
       }
 
       compute_stats <- function(df_subset, resp_name) {
-        if (is.null(factor2)) {
-          df_subset |>
-            group_by(.data[[factor1]]) |>
-            summarise(
-              mean = mean(.data[[resp_name]], na.rm = TRUE),
-              se = sd(.data[[resp_name]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp_name]]))),
-              .groups = "drop"
-            )
-        } else {
-          df_subset |>
-            group_by(.data[[factor1]], .data[[factor2]]) |>
-            summarise(
-              mean = mean(.data[[resp_name]], na.rm = TRUE),
-              se = sd(.data[[resp_name]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp_name]]))),
-              .groups = "drop"
-            )
+        if (is.null(resp_name) || !nzchar(resp_name) || !resp_name %in% names(df_subset)) {
+          return(data.frame())
         }
+
+        grouping_vars <- character()
+        if (!is.null(factor1) && nzchar(factor1) && factor1 %in% names(df_subset)) {
+          grouping_vars <- c(grouping_vars, factor1)
+        }
+        if (!is.null(factor2) && nzchar(factor2) && factor2 %in% names(df_subset)) {
+          grouping_vars <- c(grouping_vars, factor2)
+        }
+
+        if (length(grouping_vars) == 0L) {
+          return(data.frame())
+        }
+
+        resp_sym <- rlang::sym(resp_name)
+
+        df_subset |>
+          dplyr::group_by(dplyr::across(dplyr::all_of(grouping_vars))) |>
+          dplyr::summarise(
+            mean = mean(!!resp_sym, na.rm = TRUE),
+            se = stats::sd(!!resp_sym, na.rm = TRUE) /
+              sqrt(sum(!is.na(!!resp_sym))),
+            .groups = "drop"
+          )
       }
 
       build_plot <- function(stats_df, title_text, y_limits) {
