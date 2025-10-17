@@ -133,3 +133,35 @@ validate_long_format <- function(data) {
   
   "✅ Data appears to be in long format."
 }
+
+convert_flat_wide_to_long <- function(data) {
+  all_cols <- names(data)
+  
+  # Detect <prefix>_<number> pattern
+  measure_cols <- grep("^[A-Za-z]\\w*_\\d+$", all_cols, value = TRUE)
+  if (length(measure_cols) == 0)
+    stop("No '<response>_<rep>' columns detected.")
+  
+  id_cols <- setdiff(all_cols, measure_cols)
+  
+  # Pivot: .value = response name, Replicate = numeric suffix
+  long_df <- tidyr::pivot_longer(
+    data,
+    cols = dplyr::all_of(measure_cols),
+    names_to   = c(".value", "Replicate"),
+    names_pattern = "^(.+?)_(\\d+)$"
+  )
+  
+  long_df <- dplyr::mutate(long_df, Replicate = as.integer(Replicate))
+  
+  # Reorder columns: IDs → Replicate → responses
+  id_cols_in_data <- intersect(id_cols, names(long_df))
+  response_cols   <- setdiff(names(long_df), c(id_cols_in_data, "Replicate"))
+  
+  long_df <- dplyr::relocate(long_df,
+                             dplyr::all_of(id_cols_in_data),
+                             Replicate,
+                             dplyr::all_of(response_cols))
+  
+  long_df
+}
