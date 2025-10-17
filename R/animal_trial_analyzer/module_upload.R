@@ -19,6 +19,8 @@ upload_ui <- function(id) {
         ),
         selected = "long"
       ),
+      uiOutput(ns("layout_example")), 
+      hr(),
       fileInput(
         ns("file"),
         "Upload Excel file (.xlsx / .xls / .xlsm)",
@@ -45,6 +47,53 @@ upload_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     df <- reactiveVal(NULL)
+    
+    output$layout_example <- renderUI({
+      req(input$layout_type)
+      
+      long_path <- file.path("data", "toy_animal_trial_data_long.xlsx")
+      flat_path <- file.path("data", "toy_animal_trial_data_flat_wide.xlsx")
+      
+      if (!file.exists(long_path) || !file.exists(flat_path)) {
+        return(p("❌ Example files not found in /data folder."))
+      }
+      
+      if (input$layout_type == "long") {
+        toy <- readxl::read_excel(long_path, n_max = 5)
+        caption_txt <- paste(
+          "Long format — one row per animal × replicate.",
+          "Each replicate is a separate row; responses (FAMACHA, BCS, EPG) each have their own column."
+        )
+      } else {
+        toy <- readxl::read_excel(flat_path, n_max = 5)
+        caption_txt <- paste(
+          "Flat wide format — replicates stored as column suffixes (_1, _2, _3...).",
+          "Each animal appears once; replicate values span multiple columns for each response variable."
+        )
+      }
+      
+      # Give the widget a deterministic ID so we can target its caption with CSS
+      wid <- session$ns("example_dt")
+      
+      tagList(
+        tags$style(HTML(sprintf(
+          "#%s caption{white-space:normal!important;overflow-wrap:anywhere;word-break:break-word;text-align:left;line-height:1.3;font-size:0.9em;padding-bottom:6px;}",
+          wid
+        ))),
+        DT::datatable(
+          toy,
+          escape = FALSE,                      # ensure HTML caption is respected
+          elementId = wid,                     # id for the widget container
+          caption = htmltools::tags$caption(
+            htmltools::tags$b(caption_txt)
+          ),
+          options = list(dom = "t", scrollX = TRUE),
+          rownames = FALSE,
+          class = "compact stripe"
+        )
+      )
+    })
+    
       
     output$validation_msg <- renderText({ "" })
     
