@@ -128,37 +128,93 @@ prepare_anova_outputs <- function(model_obj, factor_names) {
 write_anova_docx <- function(file, results, model_obj, response_name, stratum_label = NULL) {
   doc <- officer::read_docx()
   
-  title_text <- paste("ANOVA results for:", response_name)
-  doc <- officer::body_add_par(doc, title_text, style = "heading 1")
-  
+  # ---- Title ----
+  doc <- officer::body_add_fpar(
+    doc,
+    officer::fpar(officer::ftext(paste("ANOVA results —", response_name),
+                                 prop = officer::fp_text(bold = TRUE, font.size = 12)))
+  )
   if (!is.null(stratum_label)) {
-    doc <- officer::body_add_par(doc, paste("Stratum:", stratum_label), style = "heading 2")
+    doc <- officer::body_add_fpar(
+      doc,
+      officer::fpar(officer::ftext(paste("Subset:", stratum_label),
+                                   prop = officer::fp_text(bold = TRUE)))
+    )
   }
   
-  doc <- officer::body_add_par(doc, paste("Model formula:", format(formula(model_obj))), style = "heading 2")
-  doc <- officer::body_add_par(doc, "Type III ANOVA results", style = "heading 2")
+  # Add some spacing before the ANOVA section
+  doc <- officer::body_add_par(doc, "", style = "Normal")
   
-  ft_anova <- flextable::flextable(results$anova_table)
-  if (nrow(results$anova_table) > 0) {
+  # ---- ANOVA table ----
+  doc <- officer::body_add_fpar(
+    doc,
+    officer::fpar(officer::ftext("Summary of effects",
+                                 prop = officer::fp_text(bold = TRUE)))
+  )
+  
+  doc <- officer::body_add_par(doc, "", style = "Normal")
+  
+  anova_tbl <- results$anova_table
+  keep_cols <- c("Effect", "Sum Sq", "Df", "F value", "p.value")
+  keep_cols <- intersect(keep_cols, names(anova_tbl))
+  anova_tbl <- anova_tbl[, keep_cols, drop = FALSE]
+  
+  for (col in names(anova_tbl)) {
+    if (is.numeric(anova_tbl[[col]])) anova_tbl[[col]] <- round(anova_tbl[[col]], 3)
+  }
+  
+  ft_anova <- flextable::flextable(anova_tbl)
+  ft_anova <- flextable::bold(ft_anova, part = "header")
+  if (nrow(anova_tbl) > 0 && "p.value" %in% names(anova_tbl)) {
     ft_anova <- flextable::bold(ft_anova, i = which(results$anova_significant), j = "p.value", bold = TRUE)
   }
-  ft_anova <- flextable::autofit(ft_anova)
+  ft_anova <- flextable::set_table_properties(ft_anova, width = .9, layout = "autofit")
+  ft_anova <- flextable::theme_vanilla(ft_anova)
+  ft_anova <- flextable::fontsize(ft_anova, size = 10, part = "all")
   doc <- flextable::body_add_flextable(doc, ft_anova)
   
-  doc <- officer::body_add_par(doc, "Post-hoc Tukey comparisons", style = "heading 2")
+  # Add spacing before next section
+  doc <- officer::body_add_par(doc, "", style = "Normal")
+  
+  # ---- Post-hoc results ----
+  doc <- officer::body_add_fpar(
+    doc,
+    officer::fpar(officer::ftext("Pairwise Tukey comparisons",
+                                 prop = officer::fp_text(bold = TRUE)))
+  )
+  
+  doc <- officer::body_add_par(doc, "", style = "Normal")
   
   if (is.null(results$posthoc_table) || nrow(results$posthoc_table) == 0) {
-    doc <- officer::body_add_par(doc, "No post-hoc Tukey comparisons were generated.", style = "Normal")
+    doc <- officer::body_add_par(doc, "No significant pairwise differences detected.", style = "Normal")
   } else {
-    ft_posthoc <- flextable::flextable(results$posthoc_table)
-    if (length(results$posthoc_significant) > 0) {
-      ft_posthoc <- flextable::bold(ft_posthoc, i = which(results$posthoc_significant), j = "p.value", bold = TRUE)
+    post_tbl <- results$posthoc_table
+    keep_cols <- c("Factor", "contrast", "estimate", "SE", "df", "t.ratio", "p.value")
+    keep_cols <- intersect(keep_cols, names(post_tbl))
+    post_tbl <- post_tbl[, keep_cols, drop = FALSE]
+    for (col in names(post_tbl)) {
+      if (is.numeric(post_tbl[[col]])) post_tbl[[col]] <- round(post_tbl[[col]], 3)
     }
-    ft_posthoc <- flextable::autofit(ft_posthoc)
-    doc <- flextable::body_add_flextable(doc, ft_posthoc)
+    
+    ft_post <- flextable::flextable(post_tbl)
+    ft_post <- flextable::bold(ft_post, part = "header")
+    if ("p.value" %in% names(post_tbl)) {
+      ft_post <- flextable::bold(ft_post, i = which(results$posthoc_significant), j = "p.value", bold = TRUE)
+    }
+    ft_post <- flextable::set_table_properties(ft_post, width = .9, layout = "autofit")
+    ft_post <- flextable::theme_vanilla(ft_post)
+    ft_post <- flextable::fontsize(ft_post, size = 10, part = "all")
+    doc <- flextable::body_add_flextable(doc, ft_post)
   }
   
-  doc <- officer::body_add_par(doc, "Significant differences are indicated by p < 0.05.", style = "Normal")
+  # Add spacing before footer
+  doc <- officer::body_add_par(doc, "", style = "Normal")
+  
+  # ---- Footer ----
+  doc <- officer::body_add_par(doc, "Significance level: p < 0.05 (bold values).", style = "Normal")
   
   print(doc, target = file)
 }
+
+
+

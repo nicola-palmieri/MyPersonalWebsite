@@ -13,9 +13,7 @@ two_way_anova_ui <- function(id) {
       actionButton(ns("run"), "Run Two-way ANOVA")
     ),
     results = tagList(
-      uiOutput(ns("summary_ui")),
-      br(),
-      uiOutput(ns("fixed_effects_ui"))
+      uiOutput(ns("summary_ui"))
     )
   )
 }
@@ -113,7 +111,7 @@ two_way_anova_server <- function(id, filtered_data) {
     })
     
     # ----------------------------------------------
-    # Fit two-way ANOVA model (fixed effects output)
+    # Fit two-way ANOVA model
     # ----------------------------------------------
     models <- eventReactive(input$run, {
       req(df(), input$response, input$factor1, input$factor2, input$order1, input$order2)
@@ -206,10 +204,6 @@ two_way_anova_server <- function(id, filtered_data) {
             title = responses[i],
             tags$div(
               verbatimTextOutput(ns(paste0("summary_", i))),
-              br(),
-              h4("Coefficient Table"),
-              DTOutput(ns(paste0("fixed_effects_", i))),
-              br(),
               h4("Download Results"),
               downloadButton(ns(paste0("download_", i)), "Download Results (Word)")
             )
@@ -232,10 +226,6 @@ two_way_anova_server <- function(id, filtered_data) {
                 tags$summary(strong("R Output")),
                 verbatimTextOutput(ns(paste0("summary_", i, "_", j)))
               ),
-              br(),
-              h4("Coefficient Table"),
-              DTOutput(ns(paste0("fixed_effects_", i, "_", j))),
-              br(),
               h4("Download Results"),
               downloadButton(
                 ns(paste0("download_", i, "_", j)),
@@ -252,10 +242,6 @@ two_way_anova_server <- function(id, filtered_data) {
       })
 
       do.call(tabsetPanel, c(list(id = ns("results_tabs")), tabs))
-    })
-
-    output$fixed_effects_ui <- renderUI({
-      NULL
     })
 
     observeEvent(models(), {
@@ -309,14 +295,6 @@ two_way_anova_server <- function(id, filtered_data) {
                   }
                 }
               }
-            })
-
-            output[[paste0("fixed_effects_", idx)]] <- renderDT({
-              datatable(
-                tidy_df,
-                options = list(scrollX = TRUE, pageLength = 5),
-                rownames = FALSE
-              )
             })
 
             output[[paste0("download_", idx)]] <- downloadHandler(
@@ -385,14 +363,6 @@ two_way_anova_server <- function(id, filtered_data) {
                   }
                 }
               }
-            })
-
-            output[[paste0("fixed_effects_", idx, "_", stratum_idx)]] <- renderDT({
-              datatable(
-                tidy_df,
-                options = list(scrollX = TRUE, pageLength = 5),
-                rownames = FALSE
-              )
             })
 
             output[[paste0("download_", idx, "_", stratum_idx)]] <- downloadHandler(
