@@ -12,8 +12,8 @@ lm_ui <- function(id) {
       uiOutput(ns("variable_selectors")),
       br(),
       fluidRow(
-        column(6, actionButton(ns("run"), "Run Linear Model", class = "btn-primary", width = "100%")),
-        column(6, downloadButton(ns("download_model"), "Download All Results", class = "btn-default", width = "100%"))
+        column(6, actionButton(ns("run"), "Run Linear Model")),
+        column(6, downloadButton(ns("download_model"), "Download All Results"))
       )
     ),
     results = tagList(
