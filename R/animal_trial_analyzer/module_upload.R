@@ -10,7 +10,7 @@ upload_ui <- function(id) {
     sidebarPanel(
       width = 4,
       h4("Step 1 — Upload Data"),
-      p("Upload your Excel file, choose the worksheet, and follow the guidance before proceeding."),
+      p("Upload your Excel file, choose the worksheet to analyze, and ensure the data follow either the long or wide format shown below."),
       hr(),
       radioButtons(
         ns("layout_type"),

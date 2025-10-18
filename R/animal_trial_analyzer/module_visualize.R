@@ -36,7 +36,7 @@ visualize_ui <- function(id) {
         )
       ),
       hr(),
-      downloadButton(ns("download_plot"), "Download PNG (300 dpi)")
+      downloadButton(ns("download_plot"), "Download Plot")
     ),
     mainPanel(
       width = 8,

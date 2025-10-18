@@ -125,7 +125,15 @@ prepare_anova_outputs <- function(model_obj, factor_names) {
 }
 
 # ---- 4. Word export helper ----
-write_anova_docx <- function(file, results, model_obj, response_name, stratum_label = NULL) {
+write_anova_docx <- function(doc_or_file, results, model_obj, response_name, stratum_label = NULL) {
+  if (inherits(doc_or_file, "rdocx")) {
+    doc <- doc_or_file
+    file <- tempfile(fileext = ".docx")
+  } else {
+    doc <- officer::read_docx()
+    file <- doc_or_file
+  }
+  
   doc <- officer::read_docx()
   
   # ---- Title ----
