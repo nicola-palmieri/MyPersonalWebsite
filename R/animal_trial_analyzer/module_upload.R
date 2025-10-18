@@ -34,7 +34,6 @@ upload_ui <- function(id) {
       width = 8,
       h4("Data Preview"),
       verbatimTextOutput(ns("validation_msg")),
-      hr(),
       DTOutput(ns("preview"))
     )
   )
