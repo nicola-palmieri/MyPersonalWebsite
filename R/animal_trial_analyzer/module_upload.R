@@ -1,6 +1,8 @@
 # ===============================================================
-# 🧪 Animal Trial Analyzer — Upload Module (long + flat wide support)
+# 🧪 Animal Trial Analyzer — Upload Module (long + wide support)
 # ===============================================================
+
+source("R/animal_trial_analyzer/module_upload_helpers.R")
 
 upload_ui <- function(id) {
   ns <- NS(id)
@@ -15,7 +17,7 @@ upload_ui <- function(id) {
         label = "Data layout:",
         choices = c(
           "Long format (one row per measurement)" = "long",
-          "GraphPad-Style (two header rows)"     = "graphpad"
+          "Wide format (replicates in columns)" = "wide"
         ),
         selected = "long"
       ),
@@ -26,12 +28,7 @@ upload_ui <- function(id) {
         "Upload Excel file (.xlsx / .xls / .xlsm)",
         accept = c(".xlsx", ".xls", ".xlsm")
       ),
-      uiOutput(ns("sheet_selector")),
-      hr(),
-      div(
-        class = "d-flex justify-content-end",
-        actionButton(ns("go_filter"), "Continue →", class = "btn-primary")
-      )
+      uiOutput(ns("sheet_selector"))
     ),
     mainPanel(
       width = 8,
@@ -49,26 +46,33 @@ upload_server <- function(id) {
     df <- reactiveVal(NULL)
     
     # ---- Example layouts ----
+    # ---- Example layouts ----
     output$layout_example <- renderUI({
       req(input$layout_type)
       
       long_path <- "data/toy_animal_trial_data_long.xlsx"
-      graphpad_path <- "data/toy_animal_trial_data_graphpad.xlsx"
+      wide_path <- "data/toy_animal_trial_data_wide.xlsx"
       
-      if (!file.exists(long_path) || !file.exists(graphpad_path))
+      if (!file.exists(long_path) || !file.exists(wide_path))
         return(p("❌ Example files not found in /data folder."))
       
       if (input$layout_type == "long") {
         toy <- readxl::read_excel(long_path, n_max = 5)
         caption_txt <- paste(
-          "Long format — one row per animal × replicate.",
-          "Each replicate is a separate row; responses (FAMACHA, BCS, EPG) each have their own column."
+          "Long format — one row per measurement.",
+          "Each measurement is a separate row; responses (FAMACHA, BCS, EPG) each have their own column."
         )
       } else {
-        toy <- readxl::read_excel(graphpad_path, n_max = 5)
+        toy <- readxl::read_excel(wide_path, n_max = 5)
+        
+        # Replace default "...1", "...2", etc. with empty column names
+        bad_names <- grepl("^\\.\\.\\.[0-9]+$", names(toy))
+        names(toy)[bad_names] <- "\t"
+        
         caption_txt <- paste(
-          "GraphPad-style format — two header rows.",
-          "First row: response names. Second row: replicate numbers (1, 2, 3...)."
+          "Wide format — two header rows.",
+          "Top row: responses (e.g., FAMACHA, BCS, EPG).",
+          "Bottom row: replicate numbers (1, 2, 3...)."
         )
       }
       
@@ -81,6 +85,7 @@ upload_server <- function(id) {
         class = "compact stripe"
       )
     })
+    
     
     # ---- File upload + sheet selection ----
     observeEvent(input$file, {
@@ -118,19 +123,17 @@ upload_server <- function(id) {
         return()
       }
       
-      if (input$layout_type == "graphpad") {
-        # 🧩 Handle two header rows (GraphPad)
-        hdr <- readxl::read_excel(input$file$datapath, sheet = input$sheet, n_max = 2, col_names = FALSE)
-        
-        # fill blanks in first header row
-        hdr[1, ] <- zoo::na.locf(hdr[1, ], na.rm = FALSE)
-        
-        new_names <- mapply(function(a, b) paste0(a, "_", b),
-                            hdr[1, ], hdr[2, ], SIMPLIFY = TRUE)
-        
-        tmp <- readxl::read_excel(input$file$datapath, sheet = input$sheet, skip = 2, col_names = new_names)
-        tmp <- convert_flat_wide_to_long(tmp)
-        output$validation_msg <- renderText("✅ GraphPad-style format recognized and reshaped.")
+      if (input$layout_type == "wide") {
+        # 🧩 Handle wide format with two header rows
+        tmp <- tryCatch(
+          convert_wide_to_long(input$file$datapath, sheet = input$sheet, replicate_col = "Replicate"),
+          error = function(e) e
+        )
+        if (inherits(tmp, "error")) {
+          output$validation_msg <- renderText(paste("❌ Error converting wide format:", conditionMessage(tmp)))
+          return()
+        }
+        output$validation_msg <- renderText("✅ Wide format recognized and reshaped successfully.")
       } else {
         output$validation_msg <- renderText("✅ Long format loaded successfully.")
       }

@@ -1,5 +1,5 @@
 # ===============================================================
-# 🧪 Animal Trial Analyzer — Analysis Coordinator
+# 🧪 Animal Trial Analyzer — Analysis Coordinator (fixed + cleaned)
 # ===============================================================
 source("R/animal_trial_analyzer/module_analysis_one-way_anova.R")
 source("R/animal_trial_analyzer/module_analysis_two-way_anova.R")
@@ -20,13 +20,7 @@ analysis_ui <- function(id) {
         selected = "One-way ANOVA"
       ),
       hr(),
-      uiOutput(ns("config_panel")),
-      hr(),
-      div(
-        class = "d-flex justify-content-between gap-2",
-        actionButton(ns("back_filter"), "← Back"),
-        actionButton(ns("go_visualize"), "Continue →", class = "btn-primary")
-      )
+      uiOutput(ns("config_panel"))
     ),
     mainPanel(
       width = 8,
@@ -39,55 +33,55 @@ analysis_ui <- function(id) {
 analysis_server <- function(id, filtered_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    df <- reactive(filtered_data())
     
-    df <- reactive({
-      req(filtered_data())
-      filtered_data()
-    })
+    # --- Mapping between analysis type and submodules ---
+    submodules <- list(
+      "One-way ANOVA" = list(
+        id = "anova_one",
+        ui = one_way_anova_ui,
+        server = one_way_anova_server
+      ),
+      "Two-way ANOVA" = list(
+        id = "anova_two",
+        ui = two_way_anova_ui,
+        server = two_way_anova_server
+      )
+    )
     
+    # --- Render selected submodule UI dynamically ---
     current_module_ui <- reactive({
       req(input$analysis_type)
-      if (input$analysis_type == "One-way ANOVA") {
-        one_way_anova_ui(ns("anova_one"))
-      } else if (input$analysis_type == "Two-way ANOVA") {
-        two_way_anova_ui(ns("anova_two"))
-      } else {
-        list(
-          config = p("Analysis type not implemented yet."),
-          results = p("Analysis type not implemented yet.")
-        )
-      }
+      mod <- submodules[[input$analysis_type]]
+      req(mod)
+      mod$ui(ns(mod$id))
     })
-
+    
     output$config_panel <- renderUI({
       ui <- current_module_ui()
       req(ui$config)
       ui$config
     })
-
+    
     output$results_panel <- renderUI({
       ui <- current_module_ui()
       req(ui$results)
       ui$results
     })
     
-    
-    # Dynamically run submodule
+    # --- Dynamically call selected server ---
     model_fit <- reactiveVal(NULL)
-
+    
     observeEvent(input$analysis_type, {
-      req(input$analysis_type)
-      if (input$analysis_type == "One-way ANOVA") {
-        model_fit(one_way_anova_server("anova_one", df))
-      } else if (input$analysis_type == "Two-way ANOVA") {
-        model_fit(two_way_anova_server("anova_two", df))
+      mod <- submodules[[input$analysis_type]]
+      if (!is.null(mod)) {
+        model_fit(mod$server(mod$id, df))
       } else {
         model_fit(NULL)
       }
     }, ignoreNULL = FALSE)
     
-
-    # Expose a reactive that yields the fitted model object once available
+    # --- Expose final fitted model ---
     reactive({
       model_reactive <- model_fit()
       req(model_reactive)
