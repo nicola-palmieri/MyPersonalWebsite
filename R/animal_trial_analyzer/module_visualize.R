@@ -73,13 +73,33 @@ visualize_server <- function(id, filtered_data, model_fit) {
         active_analysis_type(current_type)
 
         defaults <- if (identical(current_type, "ggpairs")) {
-          list(width = 800, height = 600)
+          list(
+            width = 800,
+            height = 600,
+            width_label = "Plot width (px)",
+            height_label = "Plot height (px)"
+          )
         } else {
-          list(width = 300, height = 200)
+          list(
+            width = 300,
+            height = 200,
+            width_label = "Subplot width (px)",
+            height_label = "Subplot height (px)"
+          )
         }
 
-        updateNumericInput(session, "subplot_width", value = defaults$width)
-        updateNumericInput(session, "subplot_height", value = defaults$height)
+        updateNumericInput(
+          session,
+          "subplot_width",
+          value = defaults$width,
+          label = defaults$width_label
+        )
+        updateNumericInput(
+          session,
+          "subplot_height",
+          value = defaults$height,
+          label = defaults$height_label
+        )
       }
     })
     
