@@ -483,12 +483,21 @@ visualize_server <- function(id, filtered_data, model_fit) {
     
     # ---- Render Plot ----
     output$mean_se_plot <- renderPlot({
-      req(plot_obj())
-      plot_obj()
+      info <- model_info()
+      req(info)
+      
+      if (!is.null(info$type) && info$type == "ggpairs") {
+        validate(need(ncol(info$data) >= 2, "Need at least two numeric columns for ggpairs."))
+        GGally::ggpairs(info$data, progress = FALSE)
+      } else {
+        req(plot_obj())
+        plot_obj()
+      }
     },
     width = function() plot_size()$w,
     height = function() plot_size()$h,
     res = 96)
+    
     
     # ---- Download Plot ----
     output$download_plot <- downloadHandler(

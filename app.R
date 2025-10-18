@@ -12,6 +12,7 @@ library(patchwork)
 library(officer)
 library(flextable)
 library(zoo)
+library(GGally)
 
 options(shiny.autoreload = TRUE)
 

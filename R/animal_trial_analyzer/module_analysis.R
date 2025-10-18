@@ -5,7 +5,7 @@ source("R/animal_trial_analyzer/module_analysis_utils.R")
 source("R/animal_trial_analyzer/module_analysis_one-way_anova.R")
 source("R/animal_trial_analyzer/module_analysis_two-way_anova.R")
 source("R/animal_trial_analyzer/module_analysis_anova_helpers.R")
-
+source("R/animal_trial_analyzer/module_analysis_pairwise_correlation.R")
 
 analysis_ui <- function(id) {
   ns <- NS(id)
@@ -18,7 +18,7 @@ analysis_ui <- function(id) {
       selectInput(
         ns("analysis_type"),
         "Select analysis type:",
-        choices = c("One-way ANOVA", "Two-way ANOVA"),
+        choices = c("One-way ANOVA", "Two-way ANOVA", "Pairwise Correlation"),
         selected = "One-way ANOVA"
       ),
       hr(),
@@ -48,6 +48,11 @@ analysis_server <- function(id, filtered_data) {
         id = "anova_two",
         ui = two_way_anova_ui,
         server = two_way_anova_server
+      ),
+      "Pairwise Correlation" = list(
+        id = "ggpairs",
+        ui = ggpairs_ui,
+        server = ggpairs_server
       )
     )
     

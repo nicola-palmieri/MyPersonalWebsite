@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 # 🧪 Animal Trial Analyzer — Veterinarian Guide
 
 Welcome to the **Animal Trial Analyzer**, a web-based Shiny application that helps veterinarians and animal health researchers evaluate intervention outcomes with confidence. No installation is required — simply open the app online and start analyzing your data.
