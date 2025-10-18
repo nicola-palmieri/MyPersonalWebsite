@@ -58,6 +58,47 @@ visualize_server <- function(id, filtered_data, model_fit) {
     model_info <- reactive({
       model_fit()
     })
+
+    active_analysis_type <- reactiveVal(NULL)
+
+    observe({
+      info <- model_info()
+      if (is.null(info)) return()
+
+      current_type <- if (!is.null(info$type)) info$type else "anova"
+      if (!identical(active_analysis_type(), current_type)) {
+        active_analysis_type(current_type)
+
+        defaults <- if (identical(current_type, "ggpairs")) {
+          list(
+            width = 800,
+            height = 600,
+            width_label = "Plot width (px)",
+            height_label = "Plot height (px)"
+          )
+        } else {
+          list(
+            width = 300,
+            height = 200,
+            width_label = "Subplot width (px)",
+            height_label = "Subplot height (px)"
+          )
+        }
+
+        updateNumericInput(
+          session,
+          "subplot_width",
+          value = defaults$width,
+          label = defaults$width_label
+        )
+        updateNumericInput(
+          session,
+          "subplot_height",
+          value = defaults$height,
+          label = defaults$height_label
+        )
+      }
+    })
     
     compute_layout <- function(n_items, rows_input, cols_input) {
       # Safely handle nulls
@@ -150,8 +191,18 @@ visualize_server <- function(id, filtered_data, model_fit) {
     
     output$layout_controls <- renderUI({
       info <- model_info()
-      has_strata <- !is.null(info) && !is.null(info$strata) && !is.null(info$strata$var)
-      n_responses <- if (!is.null(info) && !is.null(info$responses)) length(info$responses) else 0
+      if (is.null(info)) return(NULL)
+
+      current_type <- if (!is.null(info$type)) info$type else "anova"
+      if (identical(current_type, "ggpairs")) {
+        return(tagList(
+          h4("Correlation Plot Options"),
+          helpText("Pairwise correlation plots do not support grid layout controls. Adjust the plot size inputs below to resize the matrix.")
+        ))
+      }
+
+      has_strata <- !is.null(info$strata) && !is.null(info$strata$var)
+      n_responses <- if (!is.null(info$responses)) length(info$responses) else 0
       
       strata_inputs <- if (has_strata) {
         tagList(
