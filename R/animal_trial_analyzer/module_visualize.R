@@ -1,6 +1,7 @@
 # ===============================================================
 # 🧪 Animal Trial Analyzer — Visualization Module (Simplified adaptive sizing)
 # ===============================================================
+
 visualize_ui <- function(id) {
   ns <- NS(id)
   sidebarLayout(
@@ -13,26 +14,12 @@ visualize_ui <- function(id) {
       hr(),
       fluidRow(
         column(
-          width = 6,
-          numericInput(
-            ns("subplot_width"),
-            label = "Subplot width (px)",
-            value = 300,
-            min = 200,
-            max = 1200,
-            step = 50
-          )
+          6,
+          numericInput(ns("subplot_width"), "Subplot width (px)", 300, 200, 1200, 50)
         ),
         column(
-          width = 6,
-          numericInput(
-            ns("subplot_height"),
-            label = "Subplot height (px)",
-            value = 200,
-            min = 200,
-            max = 1200,
-            step = 50
-          )
+          6,
+          numericInput(ns("subplot_height"), "Subplot height (px)", 200, 200, 1200, 50)
         )
       ),
       hr(),
@@ -55,286 +42,127 @@ visualize_ui <- function(id) {
 visualize_server <- function(id, filtered_data, model_fit) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    
-    df <- reactive({
-      req(filtered_data())
-      filtered_data()
-    })
-    
-    model_info <- reactive({
-      model_fit()
-    })
-    
+
+    df <- reactive(filtered_data())
+    model_info <- reactive(model_fit())
+
+    # --- Small helpers ---
+    valid_num <- function(x, default = 0) {
+      v <- suppressWarnings(as.numeric(x))
+      if (is.null(v) || is.na(v) || v <= 0) default else v
+    }
+
     compute_layout <- function(n_items, rows_input, cols_input) {
-      # Safely handle nulls
-      if (is.null(n_items) || length(n_items) == 0 || is.na(n_items) || n_items <= 0) {
-        return(list(nrow = 1, ncol = 1))
+      if (is.null(n_items) || n_items <= 0) return(list(nrow = 1, ncol = 1))
+      r <- valid_num(rows_input, 0)
+      c <- valid_num(cols_input, 0)
+      if (r > 0 && c > 0) {
+        nrow <- r
+        ncol <- max(c, ceiling(n_items / r))
+      } else if (r > 0) {
+        nrow <- r
+        ncol <- ceiling(n_items / r)
+      } else if (c > 0) {
+        ncol <- c
+        nrow <- ceiling(n_items / c)
+      } else {
+        nrow <- ifelse(n_items <= 5, 1, 2)
+        ncol <- ceiling(n_items / nrow)
       }
-      
-      # Replace NULL or NA inputs with 0
-      if (is.null(rows_input) || is.na(rows_input)) rows_input <- 0
-      if (is.null(cols_input) || is.na(cols_input)) cols_input <- 0
-      
-      n_row_input <- suppressWarnings(as.numeric(rows_input))
-      n_col_input <- suppressWarnings(as.numeric(cols_input))
-      
-      # Handle invalid inputs
-      if (is.na(n_row_input)) n_row_input <- 0
-      if (is.na(n_col_input)) n_col_input <- 0
-      
-      if (n_row_input > 0) {
-        n_row_final <- n_row_input
-        if (n_col_input > 0) {
-          n_col_final <- max(n_col_input, ceiling(n_items / max(1, n_row_final)))
-        } else {
-          n_col_final <- ceiling(n_items / max(1, n_row_final))
+      list(nrow = max(1, nrow), ncol = max(1, ncol))
+    }
+
+    # --- Reactive holders ---
+    layout_overrides <- reactiveValues(strata_rows = 0, strata_cols = 0, resp_rows = 0, resp_cols = 0)
+    layout_manual    <- reactiveValues(strata_rows = FALSE, strata_cols = FALSE, resp_rows = FALSE, resp_cols = FALSE)
+    suppress_updates <- reactiveValues(strata_rows = TRUE, strata_cols = TRUE, resp_rows = TRUE, resp_cols = TRUE)
+
+    # --- Observe numeric inputs (DRY) ---
+    observe_numeric_input <- function(id_name) {
+      observeEvent(input[[id_name]], {
+        if (isTRUE(suppress_updates[[id_name]])) {
+          suppress_updates[[id_name]] <- FALSE
+          return()
         }
-      } else if (n_col_input > 0) {
-        n_col_final <- n_col_input
-        n_row_final <- ceiling(n_items / max(1, n_col_final))
-      } else {
-        # Default heuristic: single row if <=5 items, otherwise two
-        n_row_final <- ifelse(n_items <= 5, 1, 2)
-        n_col_final <- ceiling(n_items / n_row_final)
-      }
-      
-      list(
-        nrow = max(1, as.integer(n_row_final)),
-        ncol = max(1, as.integer(n_col_final))
-      )
+        val <- valid_num(input[[id_name]], 0)
+        layout_overrides[[id_name]] <- as.integer(val)
+        layout_manual[[id_name]] <- val > 0
+      })
     }
 
+    lapply(c("strata_rows", "strata_cols", "resp_rows", "resp_cols"), observe_numeric_input)
 
-    layout_overrides <- reactiveValues(
-      strata_rows = 0,
-      strata_cols = 0,
-      resp_rows = 0,
-      resp_cols = 0
-    )
+    effective_input <- function(name) if (layout_manual[[name]]) layout_overrides[[name]] else 0
 
-    layout_manual <- reactiveValues(
-      strata_rows = FALSE,
-      strata_cols = FALSE,
-      resp_rows = FALSE,
-      resp_cols = FALSE
-    )
-
-    suppress_updates <- reactiveValues(
-      strata_rows = TRUE,
-      strata_cols = TRUE,
-      resp_rows = TRUE,
-      resp_cols = TRUE
-    )
-
-    observeEvent(input$strata_rows, {
-      if (isTRUE(suppress_updates$strata_rows)) {
-        suppress_updates$strata_rows <- FALSE
-        return()
-      }
-      val <- suppressWarnings(as.numeric(input$strata_rows))
-      if (is.na(val) || val <= 0) {
-        layout_overrides$strata_rows <- 0
-        layout_manual$strata_rows <- FALSE
-      } else {
-        layout_overrides$strata_rows <- as.integer(val)
-        layout_manual$strata_rows <- TRUE
-      }
-    })
-
-    observeEvent(input$strata_cols, {
-      if (isTRUE(suppress_updates$strata_cols)) {
-        suppress_updates$strata_cols <- FALSE
-        return()
-      }
-      val <- suppressWarnings(as.numeric(input$strata_cols))
-      if (is.na(val) || val <= 0) {
-        layout_overrides$strata_cols <- 0
-        layout_manual$strata_cols <- FALSE
-      } else {
-        layout_overrides$strata_cols <- as.integer(val)
-        layout_manual$strata_cols <- TRUE
-      }
-    })
-
-    observeEvent(input$resp_rows, {
-      if (isTRUE(suppress_updates$resp_rows)) {
-        suppress_updates$resp_rows <- FALSE
-        return()
-      }
-      val <- suppressWarnings(as.numeric(input$resp_rows))
-      if (is.na(val) || val <= 0) {
-        layout_overrides$resp_rows <- 0
-        layout_manual$resp_rows <- FALSE
-      } else {
-        layout_overrides$resp_rows <- as.integer(val)
-        layout_manual$resp_rows <- TRUE
-      }
-    })
-
-    observeEvent(input$resp_cols, {
-      if (isTRUE(suppress_updates$resp_cols)) {
-        suppress_updates$resp_cols <- FALSE
-        return()
-      }
-      val <- suppressWarnings(as.numeric(input$resp_cols))
-      if (is.na(val) || val <= 0) {
-        layout_overrides$resp_cols <- 0
-        layout_manual$resp_cols <- FALSE
-      } else {
-        layout_overrides$resp_cols <- as.integer(val)
-        layout_manual$resp_cols <- TRUE
-      }
-    })
-
-    effective_input <- function(name) {
-      if (isTRUE(layout_manual[[name]])) {
-        layout_overrides[[name]]
-      } else {
-        0
-      }
-    }
-
-
-
+    # --- Layout controls ---
     output$layout_controls <- renderUI({
       info <- model_info()
-      has_strata <- !is.null(info) && !is.null(info$strata) && !is.null(info$strata$var)
-      n_responses <- if (!is.null(info) && !is.null(info$responses)) length(info$responses) else 0
+      has_strata <- !is.null(info$strata$var)
+      n_responses <- length(info$responses %||% 0)
 
-      strata_inputs <- if (has_strata) {
+      make_grid_controls <- function(prefix, title) {
         tagList(
-          h5("Within each response (across strata):"),
+          h5(title),
           fluidRow(
             column(
-              width = 6,
-              numericInput(
-                ns("strata_rows"),
-                "Grid rows",
-                value = isolate({
-                  val <- if (is.null(input$strata_rows)) 1 else input$strata_rows
-                  ifelse(is.na(val) || val <= 0, 1, val)
-                }),
-                min = 0,
-                step = 1
-              )
+              6,
+              numericInput(ns(paste0(prefix, "_rows")), "Grid rows",
+                           value = isolate(valid_num(input[[paste0(prefix, "_rows")]], 1)),
+                           min = 0, step = 1)
             ),
             column(
-              width = 6,
-              numericInput(
-                ns("strata_cols"),
-                "Grid columns",
-                value = isolate({
-                  val <- if (is.null(input$strata_cols)) 1 else input$strata_cols
-                  ifelse(is.na(val) || val <= 0, 1, val)
-                }),
-                min = 0,
-                step = 1
-              )
+              6,
+              numericInput(ns(paste0(prefix, "_cols")), "Grid columns",
+                           value = isolate(valid_num(input[[paste0(prefix, "_cols")]], 1)),
+                           min = 0, step = 1)
             )
           )
         )
-      } else {
-        NULL
-      }
-
-      response_inputs <- if (!is.null(n_responses) && n_responses > 1) {
-        tagList(
-          h5("Across responses:"),
-          fluidRow(
-            column(
-              width = 6,
-              numericInput(
-                ns("resp_rows"),
-                "Grid rows",
-                value = isolate({
-                  val <- if (is.null(input$resp_rows)) 1 else input$resp_rows
-                  ifelse(is.na(val) || val <= 0, 1, val)
-                }),
-                min = 0,
-                step = 1
-              )
-            ),
-            column(
-              width = 6,
-              numericInput(
-                ns("resp_cols"),
-                "Grid columns",
-                value = isolate({
-                  val <- if (is.null(input$resp_cols)) 1 else input$resp_cols
-                  ifelse(is.na(val) || val <= 0, 1, val)
-                }),
-                min = 0,
-                step = 1
-              )
-            )
-          )
-        )
-      } else {
-        NULL
       }
 
       tagList(
         h4("Layout Controls"),
-        strata_inputs,
-        response_inputs
+        if (has_strata) make_grid_controls("strata", "Within each response (across strata):"),
+        if (n_responses > 1) make_grid_controls("resp", "Across responses:")
       )
     })
 
+    # --- Plot computation ---
     plot_obj_info <- reactive({
       info <- model_info()
-      if (is.null(info) || is.null(info$models) || length(info$models) == 0) {
-        return(NULL)
-      }
+      if (is.null(info) || length(info$models) == 0) return(NULL)
 
       data <- df()
-      req(data)
-
       factor1 <- info$factors$factor1
       factor2 <- info$factors$factor2
-      order1 <- info$orders$order1
-      order2 <- info$orders$order2
+      order1  <- info$orders$order1
+      order2  <- info$orders$order2
 
-      if (!is.null(factor1) && !is.null(order1)) {
-        data[[factor1]] <- factor(data[[factor1]], levels = order1)
-      }
-      if (!is.null(factor2) && !is.null(order2)) {
-        data[[factor2]] <- factor(data[[factor2]], levels = order2)
-      }
+      if (!is.null(factor1) && !is.null(order1)) data[[factor1]] <- factor(data[[factor1]], levels = order1)
+      if (!is.null(factor2) && !is.null(order2)) data[[factor2]] <- factor(data[[factor2]], levels = order2)
 
       responses <- info$responses
-      has_strata <- !is.null(info$strata) && !is.null(info$strata$var)
-      strat_var <- if (has_strata) info$strata$var else NULL
-      strata_levels <- if (has_strata) info$strata$levels else character(0)
-      if (has_strata && (is.null(strata_levels) || length(strata_levels) == 0)) {
-        strata_levels <- unique(as.character(stats::na.omit(data[[strat_var]])))
-      }
+      has_strata <- !is.null(info$strata$var)
+      strat_var  <- if (has_strata) info$strata$var else NULL
+      strata_levels <- if (has_strata) info$strata$levels %||% unique(na.omit(as.character(data[[strat_var]]))) else character(0)
 
-      response_plots <- list()
-      max_strata_rows <- 1
-      max_strata_cols <- 1
-
-      default_strata_rows <- function(n) {
-        if (n <= 5) 1 else 2
-      }
-
-      compute_stats <- function(df_subset, resp_name) {
-        if (is.null(factor2)) {
-          df_subset |>
+      compute_stats <- function(df_sub, resp_name) {
+        if (is.null(factor2))
+          df_sub |>
             group_by(.data[[factor1]]) |>
             summarise(
               mean = mean(.data[[resp_name]], na.rm = TRUE),
               se = sd(.data[[resp_name]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp_name]]))),
               .groups = "drop"
             )
-        } else {
-          df_subset |>
+        else
+          df_sub |>
             group_by(.data[[factor1]], .data[[factor2]]) |>
             summarise(
               mean = mean(.data[[resp_name]], na.rm = TRUE),
               se = sd(.data[[resp_name]], na.rm = TRUE) / sqrt(sum(!is.na(.data[[resp_name]]))),
               .groups = "drop"
             )
-        }
       }
 
       build_plot <- function(stats_df, title_text, y_limits) {
@@ -343,222 +171,127 @@ visualize_server <- function(id, filtered_data, model_fit) {
             geom_line(aes(group = 1), color = "steelblue", linewidth = 1) +
             geom_point(size = 3, color = "steelblue") +
             geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
-                          width = 0.15, color = "gray40") +
-            theme_minimal(base_size = 14) +
-            labs(x = factor1, y = "Mean ± SE") +
-            theme(
-              panel.grid.minor = element_blank(),
-              panel.grid.major.x = element_blank()
-            )
+                          width = 0.15, color = "gray40")
         } else {
           p <- ggplot(stats_df, aes_string(
-            x = factor1,
-            y = "mean",
-            color = factor2,
-            group = factor2
+            x = factor1, y = "mean", color = factor2, group = factor2
           )) +
             geom_line(linewidth = 1) +
             geom_point(size = 3) +
             geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
-                          width = 0.15) +
-            theme_minimal(base_size = 14) +
-            labs(
-              x = factor1,
-              y = "Mean ± SE",
-              color = factor2
-            ) +
-            theme(
-              panel.grid.minor = element_blank(),
-              panel.grid.major.x = element_blank()
-            )
+                          width = 0.15)
         }
-
+        
+        p <- p +
+          theme_minimal(base_size = 14) +
+          labs(x = factor1, y = "Mean ± SE", color = factor2) +
+          theme(
+            panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank()
+          )
+        
         if (!is.null(y_limits) && all(is.finite(y_limits))) {
           p <- p + scale_y_continuous(limits = y_limits)
         }
-
+        
         p + ggtitle(title_text) +
           theme(plot.title = element_text(size = 12, face = "bold"))
       }
+      
+
+      response_plots <- list()
 
       for (resp in responses) {
         if (has_strata) {
-          stratum_plots <- list()
+          strata_plots <- list()
           y_values <- c()
-          
-          for (stratum in strata_levels) {
-            subset_data <- data[!is.na(data[[strat_var]]) & data[[strat_var]] == stratum, , drop = FALSE]
-            if (nrow(subset_data) == 0) next
-            
-            stats_df <- compute_stats(subset_data, resp)
-            if (nrow(stats_df) == 0) next
-            
-            y_values <- c(y_values, stats_df$mean - stats_df$se, stats_df$mean + stats_df$se)
-            stratum_plots[[stratum]] <- stats_df
+
+          for (s in strata_levels) {
+            sub <- data[data[[strat_var]] == s & !is.na(data[[strat_var]]), , drop = FALSE]
+            if (nrow(sub) == 0) next
+            st <- compute_stats(sub, resp)
+            if (nrow(st) == 0) next
+            y_values <- c(y_values, st$mean - st$se, st$mean + st$se)
+            strata_plots[[s]] <- st
           }
-          
-          if (length(stratum_plots) == 0) next
-          
-          y_limits <- range(y_values, na.rm = TRUE)
-          if (!all(is.finite(y_limits))) y_limits <- NULL
-          
-          strata_plot_list <- lapply(names(stratum_plots), function(stratum_name) {
-            build_plot(stratum_plots[[stratum_name]], stratum_name, y_limits)
-          })
-          
-          layout <- compute_layout(
-            length(strata_plot_list),
-            effective_input("strata_rows"),
-            effective_input("strata_cols")
+
+          if (length(strata_plots) == 0) next
+          y_lim <- range(y_values, na.rm = TRUE)
+          if (!all(is.finite(y_lim))) y_lim <- NULL
+
+          strata_plot_objs <- lapply(names(strata_plots), function(nm)
+            build_plot(strata_plots[[nm]], nm, y_lim)
           )
-          
-          max_strata_rows <- max(max_strata_rows, layout$nrow)
-          max_strata_cols <- max(max_strata_cols, layout$ncol)
-          
-          # First build the grid of strata plots
-          combined <- patchwork::wrap_plots(
-            plotlist = strata_plot_list,
-            nrow = layout$nrow,
-            ncol = layout$ncol
-          )
-          
-          
-          # ✅ robust: make a real title plot and stack it above the grid
-          title_plot <- ggplot() +
-            theme_void() +
+
+          lay <- compute_layout(length(strata_plot_objs),
+                                effective_input("strata_rows"),
+                                effective_input("strata_cols"))
+
+          combined <- patchwork::wrap_plots(strata_plot_objs, nrow = lay$nrow, ncol = lay$ncol)
+          title_plot <- ggplot() + theme_void() +
             ggtitle(resp) +
-            theme(
-              plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-              plot.margin = margin(t = 0, r = 0, b = 6, l = 0)
-            )
-          
-          # stack: title on top (small height), grid below (full height)
-          response_plots[[resp]] <- title_plot / combined + plot_layout(heights = c(0.08, 1))
-          
+            theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+                  plot.margin = margin(t = 0, b = 6))
+          response_plots[[resp]] <- title_plot / combined + patchwork::plot_layout(heights = c(0.08, 1))
+
         } else {
-          stats_df <- compute_stats(data, resp)
-          if (nrow(stats_df) == 0) {
-            next
-          }
-
-          y_values <- c(stats_df$mean - stats_df$se, stats_df$mean + stats_df$se)
-          y_limits <- range(y_values, na.rm = TRUE)
-          if (!all(is.finite(y_limits))) {
-            y_limits <- NULL
-          }
-
-          response_plots[[resp]] <- build_plot(stats_df, resp, y_limits)
-          max_strata_rows <- max(max_strata_rows, 1)
-          max_strata_cols <- max(max_strata_cols, 1)
+          st <- compute_stats(data, resp)
+          if (nrow(st) == 0) next
+          y_vals <- c(st$mean - st$se, st$mean + st$se)
+          y_lim <- if (all(is.finite(y_vals))) range(y_vals, na.rm = TRUE) else NULL
+          response_plots[[resp]] <- build_plot(st, resp, y_lim)
         }
       }
 
-      if (length(response_plots) == 0) {
-        return(NULL)
-      }
+      if (length(response_plots) == 0) return(NULL)
 
-      resp_layout <- compute_layout(
-        length(response_plots),
-        effective_input("resp_rows"),
-        effective_input("resp_cols")
-      )
+      resp_layout <- compute_layout(length(response_plots),
+                                    effective_input("resp_rows"),
+                                    effective_input("resp_cols"))
 
-      final_plot <- if (length(response_plots) == 1) {
+      final_plot <- if (length(response_plots) == 1)
         response_plots[[1]]
-      } else {
-        # Preserve each response's patchwork title
-        patchwork::wrap_plots(
-          plotlist = response_plots,
-          nrow = resp_layout$nrow,
-          ncol = resp_layout$ncol
-        ) &
+      else
+        patchwork::wrap_plots(response_plots,
+                              nrow = resp_layout$nrow,
+                              ncol = resp_layout$ncol) &
           patchwork::plot_layout(guides = "collect")
-      }
 
-      list(
-        plot = final_plot,
-        layout = list(
-          strata = list(rows = max_strata_rows, cols = max_strata_cols),
-          responses = resp_layout
-        ),
-        has_strata = has_strata,
-        n_responses = length(response_plots)
-      )
+      list(plot = final_plot, layout = list(responses = resp_layout), has_strata = has_strata)
     })
 
+    # --- Sync inputs when plots update ---
     observeEvent(plot_obj_info(), {
       info <- plot_obj_info()
-      if (is.null(info)) {
-        return()
-      }
+      if (is.null(info)) return()
 
       sync_input <- function(id, value, manual_key) {
-        val <- ifelse(is.null(value) || value <= 0, 1, value)
-        if (!isTRUE(layout_manual[[manual_key]])) {
+        v <- ifelse(is.null(value) || value <= 0, 1, value)
+        if (!layout_manual[[manual_key]]) {
           suppress_updates[[id]] <- TRUE
-          updateNumericInput(session, id, value = val)
+          updateNumericInput(session, id, value = v)
         }
       }
 
-      if (isTRUE(info$has_strata)) {
-        sync_input("strata_rows", info$layout$strata$rows, "strata_rows")
-        sync_input("strata_cols", info$layout$strata$cols, "strata_cols")
-      } else {
+      if (info$has_strata) {
         sync_input("strata_rows", 1, "strata_rows")
         sync_input("strata_cols", 1, "strata_cols")
       }
-
-      resp_rows_val <- if (info$n_responses <= 1) 1 else info$layout$responses$nrow
-      resp_cols_val <- if (info$n_responses <= 1) 1 else info$layout$responses$ncol
-
-      sync_input("resp_rows", resp_rows_val, "resp_rows")
-      sync_input("resp_cols", resp_cols_val, "resp_cols")
+      sync_input("resp_rows", info$layout$responses$nrow, "resp_rows")
+      sync_input("resp_cols", info$layout$responses$ncol, "resp_cols")
     })
 
-    plot_obj <- reactive({
-      info <- plot_obj_info()
-      if (is.null(info)) {
-        return(NULL)
-      }
-      info$plot
-    })
-    
-    # ---- Dynamic sizing logic (pixels) ----
+    # --- Plot rendering + download ---
+    plot_obj <- reactive(plot_obj_info()$plot)
+
     plot_size <- reactive({
-      info <- plot_obj_info()
-      w_sub <- input$subplot_width
-      h_sub <- input$subplot_height
-
-      if (is.null(w_sub) || is.na(w_sub)) {
-        w_sub <- 300
-      }
-      if (is.null(h_sub) || is.na(h_sub)) {
-        h_sub <- 200
-      }
-
-      if (is.null(info)) {
-        return(list(w = w_sub, h = h_sub))
-      }
-
-      strata_cols <- info$layout$strata$cols
-      strata_rows <- info$layout$strata$rows
-      resp_cols <- info$layout$responses$ncol
-      resp_rows <- info$layout$responses$nrow
-
-      if (is.null(strata_cols) || strata_cols < 1) strata_cols <- 1
-      if (is.null(strata_rows) || strata_rows < 1) strata_rows <- 1
-      if (is.null(resp_cols) || resp_cols < 1) resp_cols <- 1
-      if (is.null(resp_rows) || resp_rows < 1) resp_rows <- 1
-
-      list(
-        w = w_sub * strata_cols * resp_cols,
-        h = h_sub * strata_rows * resp_rows
-      )
+      s <- plot_obj_info()
+      w <- valid_num(input$subplot_width, 300)
+      h <- valid_num(input$subplot_height, 200)
+      if (is.null(s)) return(list(w = w, h = h))
+      list(w = w * s$layout$responses$ncol, h = h * s$layout$responses$nrow)
     })
-    
-    
-    
-    # ---- Render Plot ----
+
     output$mean_se_plot <- renderPlot({
       req(plot_obj())
       plot_obj()
@@ -566,27 +299,13 @@ visualize_server <- function(id, filtered_data, model_fit) {
     width = function() plot_size()$w,
     height = function() plot_size()$h,
     res = 96)
-    
-    # ---- Download Plot ----
+
     output$download_plot <- downloadHandler(
-      filename = function() {
-        paste0("mean_se_plot_", Sys.Date(), ".png")
-      },
+      filename = function() paste0("mean_se_plot_", Sys.Date(), ".png"),
       content = function(file) {
-        req(plot_obj())
         s <- plot_size()
-        width_in  <- s$w / 96
-        height_in <- s$h / 96
-        ggsave(
-          filename = file,
-          plot = plot_obj(),
-          device = "png",
-          dpi = 300,
-          width = width_in,
-          height = height_in,
-          units = "in",
-          limitsize = FALSE
-        )
+        ggsave(file, plot = plot_obj(), device = "png", dpi = 300,
+               width = s$w / 96, height = s$h / 96, units = "in", limitsize = FALSE)
       }
     )
   })
