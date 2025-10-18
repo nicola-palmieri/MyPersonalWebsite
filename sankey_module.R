@@ -4,10 +4,6 @@
 #' Sankey diagram. The module supports multiple tabular formats and offers an
 #' interactive data preview using DT.
 
-library(DT)
-library(readxl)
-library(data.table)
-
 # --- Demo dataset ---
 demo_sankey_data <- tibble::tribble(
   ~Species,  ~Condition,  ~Outcome,
@@ -53,7 +49,7 @@ sankey_app_ui <- function(id) {
     ),
     mainPanel(
       h4("Preview of Your Data"),
-      DTOutput(ns("preview")),
+      DT::DTOutput(ns("preview")),
       hr(),
       h4("Sankey Plot"),
       p("Each arrow shows how many items flow between categories. The width of a link corresponds to its value."),
@@ -92,9 +88,9 @@ sankey_app_server <- function(id) {
     })
     
     # Data preview
-    output$preview <- renderDT({
+    output$preview <- DT::renderDT({
       req(data())
-      datatable(
+      DT::datatable(
         data(),
         options = list(pageLength = 10, scrollX = TRUE),
         rownames = FALSE
@@ -135,7 +131,7 @@ sankey_app_server <- function(id) {
         col1 <- input$cols[i]
         col2 <- input$cols[i + 1]
         tmp <- df |>
-          dplyr::count(.data[[col1]], .data[[col2]], name = "value") |>
+          dplyr::count(rlang::.data[[col1]], rlang::.data[[col2]], name = "value") |>
           dplyr::rename(source = 1, target = 2) |>
           dplyr::mutate(dplyr::across(c(source, target), as.character))
         edges_list[[i]] <- tmp

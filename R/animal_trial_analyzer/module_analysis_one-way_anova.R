@@ -28,127 +28,6 @@ one_way_anova_server <- function(id, filtered_data) {
       filtered_data()
     })
 
-    format_p_value <- function(p_values) {
-      vapply(
-        p_values,
-        function(p) {
-          if (is.na(p)) {
-            return(NA_character_)
-          }
-          if (p < 0.001) {
-            "<0.001"
-          } else {
-            sprintf("%.2f", round(p, 2))
-          }
-        },
-        character(1)
-      )
-    }
-
-    add_significance_marker <- function(formatted_p, raw_p) {
-      mapply(
-        function(fp, rp) {
-          if (is.na(rp)) {
-            return(fp)
-          }
-          if (rp < 0.05) {
-            paste0(fp, "*")
-          } else {
-            fp
-          }
-        },
-        formatted_p,
-        raw_p,
-        USE.NAMES = FALSE
-      )
-    }
-
-    prepare_anova_outputs <- function(model_obj, factor_names) {
-      old_contrasts <- options("contrasts")
-      on.exit(options(old_contrasts), add = TRUE)
-      options(contrasts = c("contr.sum", "contr.poly"))
-
-      anova_obj <- car::Anova(model_obj, type = 3)
-      anova_df <- as.data.frame(anova_obj)
-      anova_df$Effect <- rownames(anova_df)
-      rownames(anova_df) <- NULL
-      anova_df <- anova_df[, c("Effect", setdiff(names(anova_df), "Effect"))]
-
-      p_col <- grep("^Pr", names(anova_df), value = TRUE)
-      p_col <- if (length(p_col) > 0) p_col[1] else NULL
-      raw_p <- if (!is.null(p_col)) anova_df[[p_col]] else rep(NA_real_, nrow(anova_df))
-
-      for (col in names(anova_df)) {
-        if (is.numeric(anova_df[[col]])) {
-          anova_df[[col]] <- round(anova_df[[col]], 2)
-        }
-      }
-
-      anova_significant <- !is.na(raw_p) & raw_p < 0.05
-      if (!is.null(p_col)) {
-        formatted_p <- format_p_value(raw_p)
-        anova_df[[p_col]] <- add_significance_marker(formatted_p, raw_p)
-        names(anova_df)[names(anova_df) == p_col] <- "p.value"
-      } else {
-        anova_df$p.value <- NA_character_
-      }
-
-      factor_names <- unique(factor_names[!is.na(factor_names) & nzchar(factor_names)])
-      posthoc_details <- list()
-      posthoc_combined <- NULL
-      posthoc_significant <- numeric(0)
-
-      for (factor_nm in factor_names) {
-        if (!factor_nm %in% names(model_obj$model)) {
-          next
-        }
-
-        res <- tryCatch({
-          emm <- emmeans::emmeans(model_obj, specs = factor_nm)
-          contrasts <- emmeans::contrast(emm, method = "pairwise", adjust = "tukey")
-          as.data.frame(summary(contrasts))
-        }, error = function(e) {
-          list(error = e$message)
-        })
-
-        if (is.data.frame(res)) {
-          res$Factor <- factor_nm
-          posthoc_details[[factor_nm]] <- list(table = res, error = NULL)
-          posthoc_combined <- rbind(posthoc_combined, res)
-        } else {
-          posthoc_details[[factor_nm]] <- list(table = NULL, error = res$error)
-        }
-      }
-
-      if (!is.null(posthoc_combined)) {
-        posthoc_combined <- posthoc_combined[, c("Factor", setdiff(names(posthoc_combined), "Factor"))]
-        numeric_cols <- names(posthoc_combined)[sapply(posthoc_combined, is.numeric)]
-        if (length(numeric_cols) > 0) {
-          for (col in numeric_cols) {
-            posthoc_combined[[col]] <- round(posthoc_combined[[col]], 2)
-          }
-        }
-
-        if ("p.value" %in% names(posthoc_combined)) {
-          raw_posthoc_p <- posthoc_combined$p.value
-          posthoc_significant <- !is.na(raw_posthoc_p) & raw_posthoc_p < 0.05
-          formatted_posthoc_p <- format_p_value(raw_posthoc_p)
-          posthoc_combined$p.value <- add_significance_marker(formatted_posthoc_p, raw_posthoc_p)
-        } else {
-          posthoc_significant <- rep(FALSE, nrow(posthoc_combined))
-        }
-      }
-
-      list(
-        anova_object = anova_obj,
-        anova_table = anova_df,
-        anova_significant = anova_significant,
-        posthoc_details = posthoc_details,
-        posthoc_table = posthoc_combined,
-        posthoc_significant = posthoc_significant
-      )
-    }
-
     # Dynamic selectors
     output$inputs <- renderUI({
       req(df())
@@ -356,7 +235,7 @@ one_way_anova_server <- function(id, filtered_data) {
               verbatimTextOutput(ns(paste0("summary_", i))),
               br(),
               h4("Coefficient Table"),
-              DTOutput(ns(paste0("fixed_effects_", i))),
+              DT::DTOutput(ns(paste0("fixed_effects_", i))),
               br(),
               h4("Download Results"),
               downloadButton(ns(paste0("download_", i)), "Download Results (Word)")
@@ -382,7 +261,7 @@ one_way_anova_server <- function(id, filtered_data) {
               ),
               br(),
               h4("Coefficient Table"),
-              DTOutput(ns(paste0("fixed_effects_", i, "_", j))),
+              DT::DTOutput(ns(paste0("fixed_effects_", i, "_", j))),
               br(),
               h4("Download Results"),
               downloadButton(
@@ -459,8 +338,8 @@ one_way_anova_server <- function(id, filtered_data) {
               }
             })
 
-            output[[paste0("fixed_effects_", idx)]] <- renderDT({
-              datatable(
+            output[[paste0("fixed_effects_", idx)]] <- DT::renderDT({
+              DT::datatable(
                 tidy_df,
                 options = list(scrollX = TRUE, pageLength = 5),
                 rownames = FALSE
@@ -562,8 +441,8 @@ one_way_anova_server <- function(id, filtered_data) {
               }
             })
 
-            output[[paste0("fixed_effects_", idx, "_", stratum_idx)]] <- renderDT({
-              datatable(
+            output[[paste0("fixed_effects_", idx, "_", stratum_idx)]] <- DT::renderDT({
+              DT::datatable(
                 tidy_df,
                 options = list(scrollX = TRUE, pageLength = 5),
                 rownames = FALSE
