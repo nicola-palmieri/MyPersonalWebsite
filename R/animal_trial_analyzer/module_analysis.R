@@ -36,6 +36,14 @@ analysis_ui <- function(id) {
     mainPanel(
       width = 8,
       h4("Analysis Results"),
+      div(
+        class = "alert alert-info d-flex align-items-center gap-2",
+        shiny::icon("info-circle"),
+        tags$div(
+          tags$strong("Visualization tip: "),
+          tags$span("Interactive plots for each analysis are available in the Visualize tab.")
+        )
+      ),
       uiOutput(ns("results_panel"))
     )
   )
