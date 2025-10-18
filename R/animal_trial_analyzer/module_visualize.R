@@ -1,6 +1,9 @@
 # ===============================================================
-# 🧪 Animal Trial Analyzer — Visualization Module (Simplified adaptive sizing, cleaned)
+# 🧪 Animal Trial Analyzer — Visualization Module 
 # ===============================================================
+
+source("R/animal_trial_analyzer/module_visualize_helpers.R")
+
 visualize_ui <- function(id) {
   ns <- NS(id)
   sidebarLayout(
@@ -40,8 +43,8 @@ visualize_ui <- function(id) {
     ),
     mainPanel(
       width = 8,
-      h4("Mean ± SE Plot"),
-      plotOutput(ns("mean_se_plot"))
+      h4("Plots"),
+      plotOutput(ns("plots"))
     )
   )
 }
@@ -513,13 +516,13 @@ visualize_server <- function(id, filtered_data, model_fit) {
     })
     
     # ---- Render Plot ----
-    output$mean_se_plot <- renderPlot({
+    output$plots <- renderPlot({
       info <- model_info()
       req(info)
       
       if (!is.null(info$type) && info$type == "ggpairs") {
         validate(need(ncol(info$data) >= 2, "Need at least two numeric columns for ggpairs."))
-        GGally::ggpairs(info$data, progress = FALSE)
+        build_ggpairs_plot(info$data)
       } else {
         req(plot_obj())
         plot_obj()
@@ -531,26 +534,32 @@ visualize_server <- function(id, filtered_data, model_fit) {
     
     
     # ---- Download Plot ----
+    # ---- Download Plot ----
     output$download_plot <- downloadHandler(
       filename = function() {
-        paste0("mean_se_plot_", Sys.Date(), ".png")
+        paste0("plot", Sys.Date(), ".png")
       },
       content = function(file) {
-        req(plot_obj())
+        info <- model_info()
         s <- plot_size()
         width_in  <- s$w / 96
         height_in <- s$h / 96
+        
+        if (!is.null(info$type) && info$type == "ggpairs") {
+          g <- build_ggpairs_plot(info$data)
+        } else {
+          req(plot_obj())
+          g <- plot_obj()
+        }
+        
         ggsave(
-          filename = file,
-          plot = plot_obj(),
-          device = "png",
-          dpi = 300,
-          width = width_in,
-          height = height_in,
-          units = "in",
-          limitsize = FALSE
+          file, g,
+          device = "png", dpi = 300,
+          width = width_in, height = height_in,
+          units = "in", limitsize = FALSE
         )
       }
     )
+    
   })
 }

@@ -4,7 +4,6 @@
 source("R/animal_trial_analyzer/module_analysis_utils.R")
 source("R/animal_trial_analyzer/module_analysis_one-way_anova.R")
 source("R/animal_trial_analyzer/module_analysis_two-way_anova.R")
-source("R/animal_trial_analyzer/module_analysis_anova_helpers.R")
 source("R/animal_trial_analyzer/module_analysis_pairwise_correlation.R")
 
 analysis_ui <- function(id) {

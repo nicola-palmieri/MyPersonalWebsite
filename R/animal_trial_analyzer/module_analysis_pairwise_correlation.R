@@ -1,3 +1,7 @@
+# ===============================================================
+# 🧪 Animal Trial Analyzer — Pairwise Correlation Module
+# ===============================================================
+
 ggpairs_ui <- function(id) {
   ns <- NS(id)
   list(
