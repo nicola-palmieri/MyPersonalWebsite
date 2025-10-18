@@ -51,17 +51,20 @@ analysis_server <- function(id, filtered_data) {
       "One-way ANOVA" = list(
         id = "anova_one",
         ui = one_way_anova_ui,
-        server = one_way_anova_server
+        server = one_way_anova_server,
+        type = "anova"
       ),
       "Two-way ANOVA" = list(
         id = "anova_two",
         ui = two_way_anova_ui,
-        server = two_way_anova_server
+        server = two_way_anova_server,
+        type = "anova"
       ),
       "Pairwise Correlation" = list(
         id = "ggpairs",
         ui = ggpairs_ui,
-        server = ggpairs_server
+        server = ggpairs_server,
+        type = "ggpairs"
       )
     )
     
@@ -90,11 +93,36 @@ analysis_server <- function(id, filtered_data) {
     
     observeEvent(input$analysis_type, {
       mod <- submodules[[input$analysis_type]]
-      if (!is.null(mod)) {
-        model_fit(mod$server(mod$id, df))
-      } else {
+      if (is.null(mod)) {
         model_fit(NULL)
+        return()
       }
+
+      server_result <- mod$server(mod$id, df)
+
+      if (is.null(server_result) || !is.function(server_result)) {
+        model_fit(reactive(list(type = mod$type, models = NULL)))
+        return()
+      }
+
+      model_fit(reactive({
+        raw <- tryCatch(
+          server_result(),
+          error = function(e) {
+            if (inherits(e, "shiny.silent.stop")) {
+              return(NULL)
+            }
+            stop(e)
+          }
+        )
+
+        if (is.null(raw)) {
+          return(list(type = mod$type, models = NULL))
+        }
+
+        if (is.null(raw$type)) raw$type <- mod$type
+        raw
+      }))
     }, ignoreNULL = FALSE)
     
     # --- Expose final fitted model ---

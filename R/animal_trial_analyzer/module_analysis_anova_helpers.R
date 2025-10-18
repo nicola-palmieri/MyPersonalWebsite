@@ -80,6 +80,7 @@ prepare_stratified_models <- function(df, responses, strat_var, factor1, factor2
       model_list[[resp]] <- lm(model_formula, data = df)
     }
     return(list(
+      type = "anova",
       models = model_list,
       responses = responses,
       strata = NULL,
@@ -106,6 +107,7 @@ prepare_stratified_models <- function(df, responses, strat_var, factor1, factor2
   }
   
   list(
+    type = "anova",
     models = model_list,
     responses = responses,
     strata = list(var = strat_var, levels = strata),
