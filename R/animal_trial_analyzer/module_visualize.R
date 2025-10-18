@@ -179,8 +179,8 @@ visualize_server <- function(id, filtered_data, model_fit) {
       current_type <- if (!is.null(info$type)) info$type else "anova"
       if (identical(current_type, "ggpairs")) {
         return(tagList(
-          h4("Correlation Plot Options"),
-          helpText("Pairwise correlation plots do not support grid layout controls. Adjust the plot size inputs below to resize the matrix.")
+          h4("Layout Controls"),
+          helpText("Pairwise correlation plots do not support layout controls. Adjust the plot size inputs below to resize the matrix.")
         ))
       }
 
