@@ -18,8 +18,17 @@ analysis_ui <- function(id) {
       selectInput(
         ns("analysis_type"),
         "Select analysis type:",
-        choices = c("One-way ANOVA", "Two-way ANOVA", "Pairwise Correlation"),
-        selected = "One-way ANOVA"
+        choices = list(
+          " " = "",
+          "Univariate" = c(
+            "One-way ANOVA" = "One-way ANOVA",
+            "Two-way ANOVA" = "Two-way ANOVA"
+          ),
+          "Multivariate" = c(
+            "Pairwise Correlation" = "Pairwise Correlation"
+          )
+        ),
+        selected = ""
       ),
       hr(),
       uiOutput(ns("config_panel"))
