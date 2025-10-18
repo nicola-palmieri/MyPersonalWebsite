@@ -4,6 +4,7 @@
 source("R/animal_trial_analyzer/module_analysis_utils.R")
 source("R/animal_trial_analyzer/module_analysis_one-way_anova.R")
 source("R/animal_trial_analyzer/module_analysis_two-way_anova.R")
+source("R/animal_trial_analyzer/module_analysis_lm.R")
 source("R/animal_trial_analyzer/module_analysis_pairwise_correlation.R")
 
 analysis_ui <- function(id) {
@@ -21,7 +22,8 @@ analysis_ui <- function(id) {
           " " = "",
           "Univariate" = c(
             "One-way ANOVA" = "One-way ANOVA",
-            "Two-way ANOVA" = "Two-way ANOVA"
+            "Two-way ANOVA" = "Two-way ANOVA",
+            "Linear Model (LM)" = "Linear Model (LM)"
           ),
           "Multivariate" = c(
             "Pairwise Correlation" = "Pairwise Correlation"
@@ -58,6 +60,12 @@ analysis_server <- function(id, filtered_data) {
         ui = two_way_anova_ui,
         server = two_way_anova_server,
         type = "anova"
+      ),
+      "Linear Model (LM)" = list(
+        id = "lm",
+        ui = lm_ui,
+        server = lm_server,
+        type = "lm"
       ),
       "Pairwise Correlation" = list(
         id = "ggpairs",
